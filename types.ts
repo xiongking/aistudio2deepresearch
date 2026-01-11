@@ -25,6 +25,8 @@ export interface Source {
 }
 
 export interface ResearchResult {
+  id: string; // Unique ID for history
+  timestamp: number; // Created time
   title: string;
   sections: string[]; 
   fullReport: string; 

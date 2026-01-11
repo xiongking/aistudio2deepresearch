@@ -44,6 +44,63 @@
       .scrollbar-hide::-webkit-scrollbar { display: none; }
       .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
+      /* =========================================
+         Mdtht-inspired Document Theme 
+         (Clean, Academic, Readable)
+         ========================================= */
+      .document-theme {
+        font-family: 'Noto Serif SC', serif;
+        color: #e5e5e5;
+        line-height: 1.8;
+      }
+      
+      .document-theme h1, 
+      .document-theme h2, 
+      .document-theme h3, 
+      .document-theme h4 {
+        font-family: 'Noto Serif SC', serif;
+        font-weight: 700;
+        margin-top: 2em;
+        margin-bottom: 0.8em;
+        color: #fff;
+        letter-spacing: -0.01em;
+      }
+      
+      .document-theme h1 { font-size: 2.5em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em; }
+      .document-theme h2 { font-size: 1.8em; position: relative; padding-left: 0.8em; border-left: 4px solid #3b82f6; }
+      .document-theme h3 { font-size: 1.4em; color: #cbd5e1; }
+      
+      .document-theme p { margin-bottom: 1.5em; text-align: justify; font-size: 1.05rem; color: #d4d4d8; }
+      
+      .document-theme blockquote {
+        border-left: 4px solid #64748b;
+        background: rgba(255,255,255,0.03);
+        padding: 1em 1.5em;
+        margin: 1.5em 0;
+        font-style: italic;
+        color: #94a3b8;
+        border-radius: 0 8px 8px 0;
+      }
+      
+      .document-theme ul, 
+      .document-theme ol {
+        margin-bottom: 1.5em;
+        padding-left: 1.5em;
+      }
+      
+      .document-theme li { margin-bottom: 0.5em; color: #d4d4d8; }
+      .document-theme li::marker { color: #60a5fa; }
+
+      .document-theme strong { color: #fff; font-weight: 600; }
+      
+      .document-theme a {
+        color: #60a5fa;
+        text-decoration: none;
+        border-bottom: 1px dashed rgba(96, 165, 250, 0.4);
+        transition: all 0.2s;
+      }
+      .document-theme a:hover { border-bottom-style: solid; color: #93c5fd; }
+
       /* Superscript Styling */
       sup {
         color: #60a5fa;
@@ -51,39 +108,55 @@
         font-family: 'JetBrains Mono', monospace;
         font-size: 0.75em;
         margin-left: 2px;
+        vertical-align: super;
       }
 
-      /* Markdown Table Styling - UI Dark Mode */
-      .prose table {
+      /* Table Styling */
+      .document-theme table {
         width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
+        border-collapse: collapse;
         margin: 2.5rem 0;
         font-size: 0.9em;
+        font-family: 'Inter', sans-serif; /* Tables read better in sans-serif */
         border-radius: 8px;
-        border: 1px solid var(--border-color);
         overflow: hidden;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid rgba(255,255,255,0.1);
       }
-      .prose th {
-        background-color: rgba(255,255,255,0.05);
-        border-bottom: 1px solid var(--border-color);
-        padding: 1rem 1.25rem;
+      .document-theme th {
+        background-color: rgba(255,255,255,0.08);
+        border-bottom: 2px solid rgba(255,255,255,0.1);
+        padding: 1rem;
         text-align: left;
         font-weight: 600;
         color: #fff;
-        font-family: 'Inter', sans-serif;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
       }
-      .prose td {
-        border-bottom: 1px solid var(--border-color);
-        padding: 1rem 1.25rem;
+      .document-theme td {
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        padding: 1rem;
         color: #d4d4d8;
       }
-      .prose tr:last-child td { border-bottom: none; }
+      .document-theme tr:hover td { background-color: rgba(255,255,255,0.02); }
       
-      /* Export Mode (PDF/Word) */
+      /* Code Blocks */
+      .document-theme code {
+        background: rgba(255,255,255,0.1);
+        padding: 0.2em 0.4em;
+        border-radius: 4px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85em;
+        color: #e2e8f0;
+      }
+      .document-theme pre code {
+        display: block;
+        padding: 1em;
+        overflow-x: auto;
+        background: #0f0f10;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 8px;
+        line-height: 1.5;
+      }
+
+      /* Export Mode overrides for White Paper look */
       #report-content.export-mode {
         background: white !important;
         color: black !important;
@@ -91,22 +164,18 @@
         border: none !important;
         box-shadow: none !important;
       }
-      #report-content.export-mode .prose { color: black !important; max-width: 100% !important; }
-      #report-content.export-mode h1, #report-content.export-mode h2, #report-content.export-mode h3 {
-        color: #000 !important;
-        font-family: 'Times New Roman', serif !important;
-        page-break-after: avoid;
-      }
-      #report-content.export-mode p {
-        color: #000 !important;
-        font-family: 'Times New Roman', serif !important;
-        text-align: justify;
-      }
-      #report-content.export-mode table { border: 1px solid #000 !important; width: 100% !important; }
-      #report-content.export-mode th { background-color: #f3f4f6 !important; border: 1px solid #000 !important; color: #000 !important; }
-      #report-content.export-mode td { border: 1px solid #000 !important; color: #000 !important; }
-      #report-content.export-mode a { color: #0000EE !important; text-decoration: underline !important; }
-      #report-content.export-mode .mermaid { background: none !important; border: none !important; margin: 20px auto !important; }
+      #report-content.export-mode .document-theme { color: black !important; font-family: 'Times New Roman', serif !important; }
+      #report-content.export-mode h1, 
+      #report-content.export-mode h2, 
+      #report-content.export-mode h3 { color: #000 !important; border-color: #000 !important; }
+      #report-content.export-mode p, 
+      #report-content.export-mode li,
+      #report-content.export-mode td { color: #000 !important; }
+      #report-content.export-mode table, 
+      #report-content.export-mode th, 
+      #report-content.export-mode td { border-color: #000 !important; }
+      #report-content.export-mode th { background-color: #f3f4f6 !important; }
+      #report-content.export-mode a { color: #0000EE !important; }
       #report-content.export-mode sup { color: #000 !important; }
     </style>
     <script type="importmap">

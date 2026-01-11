@@ -20,20 +20,17 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'dark',
+      theme: 'dark', // We will stick to dark theme for web view, but export handles specific colors
       securityLevel: 'loose',
-      fontFamily: 'Inter',
+      fontFamily: 'Noto Serif SC',
     });
   }, []);
 
   // Pre-process report to convert [1] to <sup>[1]</sup>
   useEffect(() => {
-    // Regex to find [number] and wrap in <sup>
-    // Avoids modifying links [text](url)
     const superscripted = report.replace(/(\[[0-9]+\])/g, '<sup>$1</sup>');
     setProcessedReport(superscripted);
     
-    // Trigger Mermaid render after DOM update
     setTimeout(() => {
       mermaid.run({
         querySelector: '.mermaid'
@@ -42,20 +39,16 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
   }, [report]);
 
   /**
-   * Prepares the DOM for export:
-   * 1. Converts Mermaid SVGs to high-res PNGs (with white background for docs).
-   * 2. Inlines table styles so Word/PDF engines render borders.
+   * Prepares DOM for export
    */
   const prepareForExport = async (container: HTMLElement) => {
-    // --- 1. Mermaid SVG to PNG ---
+    // 1. Mermaid to PNG
     const svgs = container.querySelectorAll('.mermaid svg');
     const originalSvgs: { node: Element, replacement: Element }[] = [];
 
     for (let i = 0; i < svgs.length; i++) {
       const svg = svgs[i] as SVGSVGElement;
       const box = svg.getBoundingClientRect();
-      
-      // Use standard scale
       const scale = 3; 
       const width = box.width * scale || 800;
       const height = box.height * scale || 600;
@@ -66,17 +59,12 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
       const ctx = canvas.getContext('2d');
       if (!ctx) continue;
 
-      // Ensure data is properly serialized
       const svgData = new XMLSerializer().serializeToString(svg);
-      
-      // Convert to Image
       const img = new Image();
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
-          // Draw white background
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          // Draw image
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           resolve();
         };
@@ -93,7 +81,6 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
       replacementImg.style.display = 'block';
       replacementImg.style.border = '1px solid #eee';
       
-      // Swap
       if (svg.parentElement) {
         svg.parentElement.appendChild(replacementImg);
         svg.style.display = 'none';
@@ -101,14 +88,13 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
       }
     }
 
-    // --- 2. Inline Table Styles (Critical for Word) ---
+    // 2. Inline Tables
     const tables = container.querySelectorAll('table');
     const tableCleanups: (() => void)[] = [];
     
     tables.forEach(table => {
         const originalBorder = table.style.border;
         const originalCollapse = table.style.borderCollapse;
-        
         table.style.border = '1px solid #000';
         table.style.borderCollapse = 'collapse';
         table.style.width = '100%';
@@ -119,25 +105,21 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
              const origBorder = el.style.border;
              const origPad = el.style.padding;
              const origColor = el.style.color;
-             
              el.style.border = '1px solid #000';
              el.style.padding = '8px';
              el.style.color = '#000';
-             
              tableCleanups.push(() => {
                  el.style.border = origBorder;
                  el.style.padding = origPad;
                  el.style.color = origColor;
              });
         });
-
         tableCleanups.push(() => {
             table.style.border = originalBorder;
             table.style.borderCollapse = originalCollapse;
         });
     });
 
-    // Return cleanup function
     return () => {
       originalSvgs.forEach(({ node, replacement }) => {
         (node as HTMLElement).style.display = 'block';
@@ -156,7 +138,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
     const cleanup = await prepareForExport(element);
 
     const opt = {
-      margin: [10, 10, 10, 10], // top, left, bottom, right
+      margin: [10, 10, 10, 10], 
       filename: `${title.replace(/\s+/g, '_')}_报告.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, logging: false, windowWidth: 800 },
@@ -185,7 +167,6 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
     element.classList.add('export-mode');
     const cleanup = await prepareForExport(element);
     
-    // Explicitly define Word-compatible CSS in head
     const header = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'>
       <head>
@@ -205,10 +186,8 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
     
     const content = element.innerHTML;
     const footer = "</body></html>";
-    
     const blob = new Blob([header + content + footer], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
-    
     const link = document.createElement('a');
     link.href = url;
     link.download = `${title.replace(/\s+/g, '_')}.doc`;
@@ -249,19 +228,28 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
       </div>
 
       {/* Report Paper Container */}
-      <div id="report-content" className="bg-[#0a0a0c] text-gray-200 p-8 md:p-16 lg:p-24 shadow-2xl min-h-screen rounded-xl border border-white/5">
+      <div id="report-content" className="bg-[#0a0a0c] text-gray-200 p-8 md:p-16 lg:p-24 shadow-2xl min-h-screen rounded-xl border border-white/5 relative">
         
+        {/* Decorative Watermark */}
+        <div className="absolute top-8 right-8 text-white/5 font-serif text-6xl font-bold select-none pointer-events-none opacity-20 rotate-12">DEEP RESEARCH</div>
+
         {/* Title Page Effect */}
-        <div className="border-b-2 border-white/10 pb-8 mb-12">
+        <div className="border-b border-white/10 pb-12 mb-16 text-center md:text-left">
+            <div className="inline-block px-3 py-1 mb-6 border border-blue-500/30 rounded-full bg-blue-500/10 text-blue-400 text-xs font-mono tracking-widest uppercase">
+              Generated by DeepSeeker Agent
+            </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-serif text-white mb-8 leading-tight tracking-tight">{title}</h1>
-            <div className="flex flex-wrap gap-4 text-sm font-mono text-gray-500 uppercase tracking-widest items-center">
-                <span className="bg-white/5 px-3 py-1 rounded">深度研究报告</span>
-                <span className="text-blue-500">//</span>
-                <span>内部绝密资料</span>
+            <div className="flex flex-wrap gap-6 text-sm font-mono text-gray-500 uppercase tracking-widest items-center md:justify-start justify-center">
+               <span>{new Date().toLocaleDateString()}</span>
+               <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+               <span>深度研究报告</span>
+               <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+               <span>内部绝密资料</span>
             </div>
         </div>
 
-        <article className="prose prose-invert prose-lg max-w-none prose-headings:font-serif prose-headings:font-bold prose-h1:text-4xl prose-h2:text-3xl prose-h2:text-blue-400 prose-h2:mt-16 prose-h2:mb-8 prose-h3:text-xl prose-h3:text-white/90 prose-p:leading-8 prose-p:text-gray-300 prose-a:text-blue-400 hover:prose-a:text-blue-300">
+        {/* Main Content with Document Theme */}
+        <article className="document-theme">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
@@ -275,18 +263,9 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                     </div>
                   )
                 }
-                return <code className={`${className} bg-white/10 rounded px-1.5 py-0.5 text-sm font-mono text-blue-200`} {...props}>{children}</code>
+                return <code {...props}>{children}</code>
               },
-              table: ({node, ...props}) => (
-                <div className="report-table-wrapper overflow-x-auto my-10 rounded-xl border border-white/10 bg-[#0f0f12]">
-                  <table className="w-full text-left border-collapse" {...props} />
-                </div>
-              ),
-              thead: ({node, ...props}) => <thead className="bg-white/5" {...props} />,
-              tbody: ({node, ...props}) => <tbody className="divide-y divide-white/5" {...props} />,
-              tr: ({node, ...props}) => <tr className="hover:bg-white/5 transition-colors duration-150" {...props} />,
-              th: ({node, ...props}) => <th className="p-4 font-semibold text-white/90 uppercase text-xs tracking-wider" {...props} />,
-              td: ({node, ...props}) => <td className="p-4 text-gray-400 border-t border-white/5" {...props} />,
+              // Handled by CSS class .document-theme, but we can enforce overrides if needed
               img: ({node, ...props}) => <img className="rounded-xl shadow-lg border border-white/10 my-8 w-full" {...props} alt="" />,
             }}
           >
@@ -297,16 +276,16 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
         {/* References */}
         {sources.length > 0 && (
           <div className="mt-32 pt-16 border-t border-dashed border-white/20 break-before-page">
-            <h3 className="text-3xl font-bold font-serif mb-10 text-white flex items-center gap-4">
-                <span className="text-blue-500 text-4xl">✦</span> 参考文献与数据源
+            <h3 className="text-2xl font-bold font-serif mb-10 text-white flex items-center gap-4">
+                <span className="text-blue-500 text-3xl">✦</span> 参考文献与数据源
             </h3>
-            <div className="grid grid-cols-1 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {sources.map((s, i) => (
-                <div key={i} className="group flex gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-blue-500/30 hover:bg-white/[0.07] transition-all">
+                <div key={i} className="group flex gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5 hover:border-blue-500/30 hover:bg-white/[0.05] transition-all">
                   <span className="font-mono text-blue-400 font-bold mt-1 text-sm">[{i+1}]</span>
                   <div className="overflow-hidden flex-1">
-                    <div className="text-gray-200 font-medium mb-1.5 leading-snug group-hover:text-white transition-colors">{s.title}</div>
-                    <a href={s.uri} target="_blank" rel="noreferrer" className="text-xs text-gray-500 font-mono hover:text-blue-400 transition-colors truncate block">
+                    <div className="text-gray-300 font-serif text-sm font-medium mb-1.5 leading-snug group-hover:text-white transition-colors">{s.title}</div>
+                    <a href={s.uri} target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 font-mono hover:text-blue-400 transition-colors truncate block">
                         {s.uri}
                     </a>
                   </div>

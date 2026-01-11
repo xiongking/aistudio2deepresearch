@@ -5,6 +5,7 @@ import ResearchForm from './components/ResearchForm';
 import LogStream from './components/LogStream';
 import ReportDisplay from './components/ReportDisplay';
 import SettingsModal from './components/SettingsModal';
+import HistoryDrawer from './components/HistoryDrawer';
 import { DeepResearchService } from './services/geminiService';
 import { ResearchConfig, ResearchLog, ResearchResult, AppState, Settings } from './types';
 
@@ -15,12 +16,13 @@ const App: React.FC = () => {
   const [reportTitle, setReportTitle] = useState<string>('深度研究报告');
   const [finalResult, setFinalResult] = useState<ResearchResult | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<ResearchResult[]>([]);
   
-  // Load settings from localStorage or defaults
+  // Load settings
   const [settings, setSettings] = useState<Settings>(() => {
     const stored = localStorage.getItem('ds_settings');
     if (stored) return JSON.parse(stored);
-    
     return {
       provider: 'google',
       apiKey: process.env.API_KEY || '',
@@ -31,6 +33,38 @@ const App: React.FC = () => {
 
   const serviceRef = useRef<DeepResearchService>(new DeepResearchService());
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // Load History on Mount
+  useEffect(() => {
+    const storedHistory = localStorage.getItem('ds_history');
+    if (storedHistory) {
+      try {
+        setHistory(JSON.parse(storedHistory));
+      } catch (e) {
+        console.error("Failed to load history", e);
+      }
+    }
+  }, []);
+
+  // Save History Helper
+  const saveToHistory = (result: ResearchResult) => {
+    const newHistory = [result, ...history].slice(0, 50); // Keep last 50
+    setHistory(newHistory);
+    localStorage.setItem('ds_history', JSON.stringify(newHistory));
+  };
+
+  const deleteHistoryItem = (id: string) => {
+    const newHistory = history.filter(h => h.id !== id);
+    setHistory(newHistory);
+    localStorage.setItem('ds_history', JSON.stringify(newHistory));
+  };
+
+  const loadFromHistory = (result: ResearchResult) => {
+    setState(AppState.COMPLETE);
+    setFinalResult(result);
+    setLogs(result.logs || []); // Restore logs if available
+    setReportTitle(result.title);
+  };
 
   // Auto-scroll preview
   useEffect(() => {
@@ -53,7 +87,10 @@ const App: React.FC = () => {
     try {
       const generator = serviceRef.current.startResearch(config, settings);
       
+      let currentLogs: ResearchLog[] = [];
+
       for await (const log of generator) {
+        currentLogs.push(log);
         setLogs(prev => [...prev, log]);
         
         if (log.type === 'plan' && log.message.startsWith('核心架构已生成:')) {
@@ -65,7 +102,14 @@ const App: React.FC = () => {
         }
 
         if (log.type === 'info' && log.details?.completedResult) {
-          setFinalResult(log.details.completedResult);
+          const result = {
+             ...log.details.completedResult,
+             id: crypto.randomUUID(),
+             timestamp: Date.now(),
+             logs: currentLogs
+          };
+          setFinalResult(result);
+          saveToHistory(result); // Auto save
         }
       }
       
@@ -104,6 +148,14 @@ const App: React.FC = () => {
          onSave={handleSaveSettings}
        />
 
+       <HistoryDrawer 
+         isOpen={isHistoryOpen}
+         onClose={() => setIsHistoryOpen(false)}
+         history={history}
+         onSelect={loadFromHistory}
+         onDelete={deleteHistoryItem}
+       />
+
        {/* Top Navigation - Fixed Height */}
        <header className="flex-none flex justify-between items-center px-6 py-4 border-b border-white/5 bg-[#030303]/80 backdrop-blur-md z-40">
            <div className="flex items-center gap-3 cursor-pointer group" onClick={handleReset}>
@@ -116,6 +168,16 @@ const App: React.FC = () => {
            </div>
            
            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsHistoryOpen(true)}
+                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                title="历史记录"
+              >
+                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </button>
+
+              <div className="h-4 w-px bg-white/10"></div>
+
               <button 
                 onClick={() => setIsSettingsOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono text-gray-400 hover:text-white hover:bg-white/5 rounded border border-transparent hover:border-white/10 transition-all"
