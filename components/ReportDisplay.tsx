@@ -16,40 +16,43 @@ interface TOCItem {
   id: string;
   text: string;
   level: number;
+  children: TOCItem[];
 }
 
 const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, onReset }) => {
-  const [isExporting, setIsExporting] = useState(false);
   const [processedReport, setProcessedReport] = useState(report);
   const [toc, setToc] = useState<TOCItem[]>([]);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   
   // TOC Sidebar State
-  const [tocWidth, setTocWidth] = useState(280);
-  const [isTocVisible, setIsTocVisible] = useState(true);
-  const tocRef = useRef<HTMLDivElement>(null);
-  const isResizingToc = useRef(false);
+  const [isTocOpen, setIsTocOpen] = useState(false);
 
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
-      theme: 'base',
-      themeVariables: {
-        fontFamily: 'Source Sans 3',
-        primaryColor: '#F5F3F0',
-        primaryTextColor: '#1A1A1A',
-        primaryBorderColor: '#B8860B',
-        lineColor: '#1A1A1A',
-        secondaryColor: '#FAFAF8',
-        tertiaryColor: '#fff',
-      },
+      theme: 'neutral',
       securityLevel: 'loose',
+      fontFamily: 'Source Sans 3',
     });
   }, []);
 
-  // Parse Headers for TOC and add IDs to Report
+  // Mermaid Rerender Trigger
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        mermaid.run({
+            querySelector: '.mermaid'
+        }).catch(err => console.debug('Mermaid init error (harmless if no graphs):', err));
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [processedReport]);
+
+  // Parse Headers for TOC (H1 -> H2 -> H3)
   useEffect(() => {
     const lines = report.split('\n');
-    const newToc: TOCItem[] = [];
+    const rootToc: TOCItem[] = [];
+    let currentH1: TOCItem | null = null;
+    let currentH2: TOCItem | null = null;
+
     const newLines = lines.map((line) => {
       const match = line.match(/^(#{1,3})\s+(.*)$/);
       if (match) {
@@ -57,94 +60,61 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
         const text = match[2];
         const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
         
-        if (level > 1) { 
-           newToc.push({ id, text, level });
-           return `<h${level} id="${id}">${text}</h${level}>`;
+        const item: TOCItem = { id, text, level, children: [] };
+
+        if (level === 1) {
+            rootToc.push(item);
+            currentH1 = item;
+            currentH2 = null;
+            // Expand Level 1 by default to show Level 2
+            setExpandedSections(prev => new Set(prev).add(id));
+        } else if (level === 2) {
+            if (currentH1) {
+                currentH1.children.push(item);
+            } else {
+                rootToc.push(item); // Fallback if no H1
+            }
+            currentH2 = item;
+            // Level 2 not expanded by default (hiding Level 3)
+        } else if (level === 3) {
+            if (currentH2) {
+                currentH2.children.push(item);
+            } else if (currentH1) {
+                currentH1.children.push(item);
+            }
         }
+        
+        return `<h${level} id="${id}">${text}</h${level}>`;
       }
       return line;
     });
 
-    setToc(newToc);
-    // Strip citations for display
+    // Add References to TOC if sources exist
+    if (sources.length > 0) {
+        rootToc.push({
+            id: 'references-section',
+            text: '参考文献与数据源',
+            level: 1,
+            children: []
+        });
+    }
+
+    setToc(rootToc);
+    // Strip citations like [1]
     const contentWithoutCitations = newLines.join('\n').replace(/\[([0-9]+)\]/g, ''); 
     setProcessedReport(contentWithoutCitations);
-    
-    setTimeout(() => {
-      mermaid.run({ querySelector: '.mermaid' });
-    }, 100);
-  }, [report]);
-
-  // TOC Resizing Logic
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingToc.current) return;
-      // Resizing from the left edge of right sidebar
-      const newWidth = window.innerWidth - e.clientX;
-      if (newWidth > 200 && newWidth < 500) {
-        setTocWidth(newWidth);
-      }
-    };
-
-    const handleMouseUp = () => {
-      isResizingToc.current = false;
-      document.body.style.cursor = 'default';
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-
-  const handleTocMouseDown = (e: React.MouseEvent) => {
-    isResizingToc.current = true;
-    document.body.style.cursor = 'col-resize';
-    e.preventDefault();
-  };
+  }, [report, sources]);
 
   const handleScrollTo = (id: string) => {
     const element = document.getElementById(id);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (element) element.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleExportMarkdown = () => {
-    const blob = new Blob([report], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${title.replace(/\s+/g, '_')}.md`;
-    link.click();
-  };
-
-  const handleExportWord = async () => {
-    setIsExporting(true);
-    const element = document.getElementById('report-content');
-    if (!element) return;
-
-    const originalStyle = element.getAttribute('style');
-    element.style.padding = '0';
-    element.style.margin = '0';
-    element.style.maxWidth = '100%';
-
-    const article = element.querySelector('article');
-    const content = article ? article.innerHTML : element.innerHTML;
-    
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><title>${title}</title><style>body{font-family:'Times New Roman',serif; font-size:12pt;} h1,h2,h3{font-family:'Arial',sans-serif; color:#333;} table{border-collapse:collapse;width:100%;border:1px solid #000;} td,th{border:1px solid #000;padding:8px;}</style></head><body>`;
-    const footer = "</body></html>";
-    const blob = new Blob([header + content + footer], { type: 'application/msword' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${title.replace(/\s+/g, '_')}.doc`;
-    link.click();
-
-    element.setAttribute('style', originalStyle || '');
-    setIsExporting(false);
+  const toggleSection = (id: string) => {
+    const newSet = new Set(expandedSections);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedSections(newSet);
   };
 
   const getFaviconUrl = (url: string) => {
@@ -157,101 +127,93 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
   };
 
   return (
-    <div className="w-full h-full flex relative">
+    <div className="w-full h-full flex relative bg-editorial-highlight">
       
       {/* Main Content Area */}
-      <div className="flex-1 bg-[#F5F3F0] h-full relative overflow-y-auto custom-scrollbar flex flex-col items-center">
+      <div className="flex-1 h-full relative overflow-y-auto custom-scrollbar flex flex-col items-center">
         
-        {/* Floating Toolbar */}
-        <div className="sticky top-4 z-40 w-full max-w-[800px] flex justify-end pointer-events-none px-4 md:px-0">
-           <div className="pointer-events-auto flex gap-2 bg-white/90 backdrop-blur border border-editorial-border shadow-sm p-1.5 rounded-full">
-              <button disabled={isExporting} onClick={handleExportMarkdown} className="px-3 py-1.5 hover:bg-gray-100 text-xs font-sans font-medium text-editorial-text rounded-full transition-colors flex items-center gap-2">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                Markdown
-              </button>
-              <div className="w-px bg-editorial-border my-1"></div>
-              <button disabled={isExporting} onClick={handleExportWord} className="px-3 py-1.5 hover:bg-gray-100 text-xs font-sans font-medium text-editorial-text rounded-full transition-colors flex items-center gap-2">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                Word
-              </button>
-              <div className="w-px bg-editorial-border my-1"></div>
-              <button onClick={() => setIsTocVisible(!isTocVisible)} className="px-3 py-1.5 hover:bg-gray-100 text-xs font-sans font-medium text-editorial-text rounded-full transition-colors">
-                 {isTocVisible ? '隐藏目录' : '显示目录'}
-              </button>
-           </div>
-        </div>
-
-        {/* Paper Container (A4 Width approx 800px) */}
-        <div id="report-content" className="w-full max-w-[800px] bg-white shadow-editorial-lg min-h-screen my-8 px-12 py-16 md:px-16 md:py-20 animate-fade-in relative z-10">
+        {/* Paper Container */}
+        <div id="report-container" className="w-full max-w-5xl bg-white shadow-xl my-10 px-12 py-16 md:px-20 md:py-24 animate-fade-in relative z-10 box-border min-h-screen rounded-sm">
           
-          {/* Header */}
-          <div className="border-b-2 border-editorial-text pb-8 mb-12 text-center">
-              <div className="mb-6 font-mono text-xs uppercase tracking-[0.3em] text-editorial-accent">
-                Deep Research Report
-              </div>
-              <h1 className="text-3xl md:text-5xl font-serif font-bold text-editorial-text mb-6 leading-tight">{title}</h1>
-              <div className="flex justify-center items-center gap-6 text-sm font-serif italic text-editorial-subtext">
-                 <span>{new Date().toLocaleDateString('zh-CN', {year:'numeric', month:'long', day:'numeric'})}</span>
-                 <span className="w-1 h-1 rounded-full bg-editorial-border"></span>
-                 <span>深度分析</span>
-                 <span className="w-1 h-1 rounded-full bg-editorial-border"></span>
-                 <span>{sources.length} 处引用</span>
+          {/* Header - Date Only */}
+          <div className="pb-4 mb-4 text-left border-b border-editorial-border">
+              <div className="text-sm font-serif italic text-editorial-subtext">
+                 {new Date().toLocaleDateString('zh-CN', {year:'numeric', month:'long', day:'numeric'})}
               </div>
           </div>
 
           {/* Content */}
           <article className="document-theme">
+            <style>{`
+              .document-theme p {
+                text-indent: 2em;
+                text-align: justify;
+              }
+              .document-theme h1, .document-theme h2, .document-theme h3, .document-theme li, .document-theme td, .document-theme th, .document-theme blockquote p {
+                text-indent: 0;
+              }
+            `}</style>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
               components={{
-                h2: ({node, ...props}) => <h2 className="scroll-mt-24" {...props} />, 
-                h3: ({node, ...props}) => <h3 className="scroll-mt-24" {...props} />,
+                // Markdown H1 is the main title, ensure it's not indented and left aligned
+                h1: ({node, ...props}) => <h1 className="text-4xl font-serif font-bold text-editorial-text mb-8 text-left !indent-0" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-2xl font-serif font-bold text-editorial-text mt-8 mb-4 text-left !indent-0 scroll-mt-24" {...props} />, 
+                h3: ({node, ...props}) => <h3 className="text-xl font-serif font-bold text-editorial-text mt-6 mb-3 text-left !indent-0 scroll-mt-24" {...props} />,
+                // Custom Table Styling (Zebra + Header Colors)
+                table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed !indent-0" {...props} />,
+                thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent" {...props} />,
+                tbody: ({node, ...props}) => <tbody {...props} />,
+                tr: ({node, ...props}) => <tr className="even:bg-[#FAFAF8] hover:bg-editorial-highlight/80 border-b border-editorial-border/30 last:border-0 transition-colors" {...props} />,
+                th: ({node, ...props}) => <th className="p-3 font-serif font-bold text-sm uppercase tracking-wider text-editorial-text !indent-0" {...props} />,
+                td: ({node, ...props}) => <td className="p-3 font-sans text-sm text-editorial-text align-top !indent-0" {...props} />,
+                
+                // Mermaid Rendering Fix: Render a DIV with class mermaid
                 code({node, className, children, ...props}) {
                   const match = /language-mermaid/.test(className || '')
                   if (match) {
                     return (
-                      <div className="mermaid bg-[#F9F9F9] p-8 border border-editorial-border flex justify-center my-12 overflow-x-auto">
+                      <div className="mermaid bg-[#FAFAF8] p-6 border border-editorial-border flex justify-center my-10 overflow-x-auto rounded-sm !indent-0">
                         {String(children).replace(/\n$/, '')}
                       </div>
                     )
                   }
-                  return <code className="bg-editorial-highlight text-editorial-accent px-1.5 py-0.5 rounded-sm text-sm font-mono" {...props}>{children}</code>
+                  return <code className="bg-editorial-highlight text-editorial-accent px-1.5 py-0.5 rounded-sm text-sm font-mono !indent-0" {...props}>{children}</code>
                 },
-                img: ({node, ...props}) => <img className="shadow-editorial-md border border-editorial-border my-8 w-full block" {...props} alt="" />,
+                img: ({node, ...props}) => <img className="shadow-editorial-md border border-editorial-border my-8 w-full block !indent-0" {...props} alt="" />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-4 !indent-0" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-4 !indent-0" {...props} />,
+                li: ({node, ...props}) => <li className="mb-1 !indent-0 pl-1" {...props} />
               }}
             >
               {processedReport}
             </ReactMarkdown>
           </article>
 
-          {/* Refactored References (Embedded Links) */}
+          {/* Refactored References (Level 1 Header Style) */}
           {sources.length > 0 && (
-            <div className="mt-24 pt-12 border-t border-editorial-border break-before-page">
-              <h3 className="text-2xl font-serif font-bold mb-8 text-editorial-text flex items-center gap-3">
-                  <span className="text-editorial-accent text-xl">§</span> 参考文献与数据源
-              </h3>
-              <div className="grid grid-cols-1 gap-4">
+            <div id="references-section" className="mt-16 pt-8 border-t-2 border-editorial-text break-before-page">
+              <h1 className="text-2xl font-serif font-bold mb-8 text-editorial-text flex items-center gap-2 !indent-0">
+                 参考文献与数据源
+              </h1>
+              <div className="grid grid-cols-1 gap-1.5 !indent-0">
                 {sources.map((s, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <span className="font-mono text-editorial-subtext text-xs pt-1.5 w-6 text-right">[{i+1}]</span>
+                  <div key={i} className="flex items-start gap-2 text-sm !indent-0">
+                    <span className="font-mono text-editorial-subtext text-[10px] pt-1 w-5 text-right flex-none">[{i+1}]</span>
                     
-                    <a href={s.uri} target="_blank" rel="noreferrer" className="group flex-1 flex items-center gap-3 p-3 rounded-lg border border-transparent hover:bg-editorial-highlight hover:border-editorial-border transition-all">
-                        {/* Favicon */}
-                        <div className="w-8 h-8 rounded bg-white border border-editorial-border flex items-center justify-center flex-none">
-                            <img src={getFaviconUrl(s.uri)} alt="" className="w-4 h-4 opacity-80" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                        </div>
+                    <a href={s.uri} target="_blank" rel="noreferrer" className="group flex items-center gap-2 hover:bg-editorial-highlight px-2 rounded -ml-2 transition-colors max-w-full">
+                        {/* Compact Favicon */}
+                        <img 
+                          src={getFaviconUrl(s.uri)} 
+                          alt="•" 
+                          className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 flex-none" 
+                          onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOViOUI5IiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PC9zdmc+' }} 
+                        />
                         
-                        <div className="flex-1">
-                             <div className="font-serif font-medium text-editorial-text group-hover:text-editorial-accent transition-colors leading-tight">
-                                {s.title}
-                             </div>
-                             <div className="text-[10px] font-mono text-editorial-subtext mt-1 truncate max-w-[300px] opacity-60">
-                                {s.uri}
-                             </div>
-                        </div>
-
-                        <svg className="w-4 h-4 text-editorial-subtext opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        <span className="font-serif text-editorial-text border-b border-transparent group-hover:border-editorial-accent group-hover:text-editorial-accent transition-all truncate leading-snug">
+                            {s.title}
+                        </span>
                     </a>
                   </div>
                 ))}
@@ -261,38 +223,95 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
         </div>
       </div>
 
-      {/* Resizable Right TOC Sidebar */}
-      {isTocVisible && (
-        <>
-            <div 
-                className="w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-20 flex-none"
-                onMouseDown={handleTocMouseDown}
-            ></div>
-            <div 
-                ref={tocRef}
-                style={{ width: tocWidth }} 
-                className="hidden lg:block flex-none sticky top-0 h-screen overflow-y-auto border-l border-editorial-border bg-white p-8 z-10"
+      {/* Side Marker TOC Toggle */}
+      <button 
+        onClick={() => setIsTocOpen(!isTocOpen)}
+        className={`fixed top-1/2 right-0 transform -translate-y-1/2 z-50 bg-white border border-r-0 border-editorial-border shadow-md py-3 pl-2 pr-1 rounded-l-md transition-all duration-300 hover:bg-editorial-highlight ${isTocOpen ? 'translate-x-full' : 'translate-x-0'}`}
+        title="显示/隐藏目录"
+      >
+        <div className="writing-vertical-rl text-xs font-mono font-bold text-editorial-subtext tracking-widest uppercase flex items-center gap-2">
+           <span className="w-1 h-1 rounded-full bg-editorial-accent"></span>
+           目录
+        </div>
+      </button>
+
+      {/* Right TOC Sidebar */}
+      <div 
+        className={`fixed top-0 right-0 h-full bg-white/95 backdrop-blur shadow-2xl z-40 transition-transform duration-300 transform border-l border-editorial-border flex flex-col ${isTocOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        style={{ width: '320px' }}
+      >
+          <div className="p-6 border-b border-editorial-border flex justify-between items-center bg-editorial-bg/50">
+            <h3 className="font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">报告结构</h3>
+            {/* Added Clear Close Button X */}
+            <button 
+                onClick={() => setIsTocOpen(false)} 
+                className="p-2 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                title="关闭目录"
             >
-                <div className="mb-6">
-                <h3 className="font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest mb-4">目录</h3>
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-6 space-y-1 custom-scrollbar">
+            {toc.map((item) => (
+                <div key={item.id}>
+                    <div className="flex items-center gap-1 group py-0.5">
+                        {item.children.length > 0 && (
+                        <button onClick={() => toggleSection(item.id)} className="p-1 text-gray-400 hover:text-editorial-accent flex-none">
+                            <svg className={`w-3 h-3 transition-transform ${expandedSections.has(item.id) ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                        </button>
+                        )}
+                        <button
+                        onClick={() => handleScrollTo(item.id)}
+                        className={`block text-left text-sm transition-colors hover:text-editorial-accent leading-snug w-full ${item.children.length === 0 ? 'pl-5' : ''} ${
+                            item.level === 1 ? 'font-serif font-bold text-editorial-text pt-2' :
+                            item.level === 2 ? 'font-serif font-medium text-editorial-text/90 pl-1' : 'font-sans text-gray-500 pl-2 text-xs'
+                        }`}
+                        >
+                        {item.text}
+                        </button>
+                    </div>
+                    
+                    {expandedSections.has(item.id) && item.children.length > 0 && (
+                        <div className={`border-l border-editorial-border ml-2.5 ${item.level === 1 ? 'pl-2' : 'pl-4'}`}>
+                            {item.children.map(child => (
+                                <div key={child.id}>
+                                    <div className="flex items-center gap-1 group">
+                                         {child.children.length > 0 && (
+                                            <button onClick={() => toggleSection(child.id)} className="p-1 text-gray-400 hover:text-editorial-accent flex-none">
+                                                <svg className={`w-3 h-3 transition-transform ${expandedSections.has(child.id) ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                            </button>
+                                         )}
+                                        <button
+                                            onClick={() => handleScrollTo(child.id)}
+                                            className={`block text-left text-xs transition-colors hover:text-editorial-accent py-1 w-full truncate ${child.children.length === 0 ? 'pl-5' : ''} ${child.level === 2 ? 'font-serif font-medium text-editorial-text/90' : 'text-gray-400'}`}
+                                        >
+                                            {child.text}
+                                        </button>
+                                    </div>
+                                    
+                                    {/* Level 3 Children */}
+                                    {expandedSections.has(child.id) && child.children.length > 0 && (
+                                        <div className="pl-6 border-l border-editorial-border ml-2.5">
+                                            {child.children.map(subChild => (
+                                                <button
+                                                    key={subChild.id}
+                                                    onClick={() => handleScrollTo(subChild.id)}
+                                                    className="block text-left text-[10px] text-gray-300 hover:text-editorial-accent py-0.5 w-full truncate"
+                                                >
+                                                    {subChild.text}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
-                <nav className="space-y-3">
-                {toc.map((item) => (
-                    <button
-                    key={item.id}
-                    onClick={() => handleScrollTo(item.id)}
-                    className={`block text-left text-sm transition-colors hover:text-editorial-accent leading-snug w-full ${
-                        item.level === 2 ? 'font-serif font-medium text-editorial-text' : 
-                        item.level === 3 ? 'font-sans text-editorial-subtext pl-4 text-xs' : 'pl-6 text-xs text-gray-400'
-                    }`}
-                    >
-                    {item.text}
-                    </button>
-                ))}
-                </nav>
-            </div>
-        </>
-      )}
+            ))}
+          </div>
+      </div>
     </div>
   );
 };

@@ -53,6 +53,10 @@ const App: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ResearchResult[]>([]);
   
+  // Logic for Time Estimation
+  const [totalChapters, setTotalChapters] = useState(0);
+  const [completedChapters, setCompletedChapters] = useState(0);
+  
   // Interim State for Outline Approval
   const [pendingOutline, setPendingOutline] = useState<{ title: string, chapters: string[] } | null>(null);
   const [currentConfig, setCurrentConfig] = useState<ResearchConfig | null>(null);
@@ -66,10 +70,10 @@ const App: React.FC = () => {
     const stored = localStorage.getItem('ds_settings');
     if (stored) return JSON.parse(stored);
     return {
-      provider: 'google',
-      apiKey: process.env.API_KEY || '',
-      baseUrl: '',
-      model: 'gemini-3-pro-preview'
+      provider: 'openai',
+      apiKey: '',
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o'
     };
   });
 
@@ -91,7 +95,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizingSidebar.current) return;
-      if (e.clientX > 200 && e.clientX < 600) {
+      if (e.clientX > 250 && e.clientX < 600) {
         setSidebarWidth(e.clientX);
       }
     };
@@ -124,6 +128,7 @@ const App: React.FC = () => {
     setFinalResult(result);
     setLogs(result.logs || []);
     setReportTitle(result.title);
+    setCurrentConfig({ query: result.title, depth: 3, breadth: 3 }); // Approximate restore
   };
 
   useEffect(() => {
@@ -148,6 +153,7 @@ const App: React.FC = () => {
     }]);
     setAccumulatedReport('');
     setFinalResult(null);
+    setCompletedChapters(0);
 
     try {
       const { title, chapters, usage } = await serviceRef.current.generateResearchPlan(config, settings);
@@ -171,8 +177,18 @@ const App: React.FC = () => {
   const handleApproveOutline = async (title: string, chapters: string[]) => {
     if (!currentConfig) return;
     
+    // Update logs to reflect approved outline
+    setLogs(prev => [...prev, {
+       id: crypto.randomUUID(),
+       timestamp: Date.now(),
+       type: 'plan',
+       message: `架构已确认，包含 ${chapters.length} 个章节`,
+       details: chapters
+    }]);
+
     setState(AppState.RESEARCHING);
     setReportTitle(title);
+    setTotalChapters(chapters.length);
     
     try {
       const generator = serviceRef.current.executeResearch(currentConfig, settings, title, chapters);
@@ -182,6 +198,11 @@ const App: React.FC = () => {
         currentLogs.push(log);
         setLogs(prev => [...prev, log]);
         
+        // Track Progress
+        if (log.type === 'info' && log.message.includes('完成')) {
+            setCompletedChapters(prev => prev + 1);
+        }
+
         if (log.type === 'info' && log.details?.partialSection) {
             setAccumulatedReport(prev => prev + '\n\n' + log.details.partialSection);
         }
@@ -233,6 +254,7 @@ const App: React.FC = () => {
     setAccumulatedReport('');
     setFinalResult(null);
     setPendingOutline(null);
+    setCurrentConfig(null);
   };
 
   return (
@@ -254,46 +276,53 @@ const App: React.FC = () => {
        />
 
        {/* Top Navigation */}
-       <header className="flex-none flex justify-between items-center px-8 py-5 z-40 bg-editorial-bg border-b border-editorial-border">
-           <div className="flex items-center gap-4 cursor-pointer group" onClick={handleReset}>
-               <div className="w-8 h-8 flex items-center justify-center border border-editorial-text rounded-sm transition-all group-hover:bg-editorial-text group-hover:text-white">
-                   <span className="font-serif font-bold text-lg">D</span>
-               </div>
-               <div className="flex flex-col">
-                   <span className="font-serif font-bold text-lg text-editorial-text leading-none tracking-tight">
-                     深度研究
-                   </span>
-                   <span className="font-mono text-[10px] text-editorial-accent uppercase tracking-widest leading-none mt-1">
-                     DeepSeeker Agent
-                   </span>
-               </div>
+       <header className="flex-none flex justify-between items-center px-8 py-4 z-40 bg-editorial-bg border-b border-editorial-border">
+           <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4 cursor-pointer group" onClick={handleReset}>
+                  <div className="w-8 h-8 flex items-center justify-center border border-editorial-text rounded-sm transition-all group-hover:bg-editorial-text group-hover:text-white">
+                      <span className="font-serif font-bold text-lg">D</span>
+                  </div>
+                  <div className="flex flex-col">
+                      <span className="font-serif font-bold text-lg text-editorial-text leading-none tracking-tight">
+                        深度研究
+                      </span>
+                  </div>
+              </div>
+
+              {/* Current Topic Display */}
+              {currentConfig?.query && state !== AppState.IDLE && (
+                 <div className="hidden md:flex items-center text-sm font-serif text-editorial-text border-l border-editorial-border pl-6 max-w-lg truncate">
+                    <span className="text-editorial-accent mr-2 italic">正在研究:</span>
+                    <span className="truncate font-medium">{currentConfig.query}</span>
+                 </div>
+              )}
            </div>
            
-           <div className="flex items-center gap-6">
-              {/* Reset Button moved here */}
-              <button 
-                onClick={handleReset}
-                className="text-sm font-sans font-medium text-editorial-subtext hover:text-editorial-accent transition-colors flex items-center gap-2"
-              >
-                 <span className="w-4 h-4 border border-current rounded-full flex items-center justify-center text-[10px]">+</span>
-                 新研究
-              </button>
-              
+           <div className="flex items-center gap-4">
               <button
                 onClick={() => setIsHistoryOpen(true)}
-                className="text-sm font-sans font-medium text-editorial-subtext hover:text-editorial-accent transition-colors flex items-center gap-2"
+                className="flex items-center gap-2 px-3 py-1.5 border border-editorial-border rounded text-xs font-sans font-medium text-editorial-subtext hover:border-editorial-accent hover:text-editorial-accent transition-all"
               >
-                 <span className="font-serif italic">档案</span>
+                 <span className="w-4 h-4 flex items-center justify-center">H</span>
+                 <span>历史记录</span>
+              </button>
+              
+              <button 
+                onClick={handleReset}
+                className="flex items-center gap-2 px-3 py-1.5 border border-editorial-border rounded text-xs font-sans font-medium text-editorial-subtext hover:border-editorial-accent hover:text-editorial-accent transition-all"
+              >
+                 <span className="w-4 h-4 flex items-center justify-center">+</span>
+                 <span>新研究</span>
               </button>
 
-              <div className="h-4 w-px bg-editorial-border"></div>
+              <div className="h-4 w-px bg-editorial-border mx-2"></div>
 
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-editorial-subtext hover:text-editorial-text transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 border border-editorial-border rounded text-xs font-mono uppercase tracking-wider text-editorial-subtext hover:text-editorial-text hover:border-editorial-text transition-all"
               >
-                <span>{settings.model || 'GEMINI'}</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${settings.provider === 'google' ? 'bg-editorial-accent' : 'bg-gray-400'}`}></span>
+                <span>{settings.model || 'MODEL'}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${settings.provider === 'google' ? 'bg-editorial-accent' : 'bg-green-500'}`}></span>
               </button>
            </div>
        </header>
@@ -339,14 +368,21 @@ const App: React.FC = () => {
                 {/* Sidebar (Log Stream) with Resize */}
                 <div 
                   style={{ width: sidebarWidth }}
-                  className={`flex-none bg-editorial-bg border-r border-editorial-border flex flex-col ${state === AppState.COMPLETE ? '' : ''}`}
+                  className="flex-none bg-editorial-bg border-r border-editorial-border flex flex-col h-full"
                 >
-                    <LogStream logs={logs} />
+                    <LogStream 
+                        logs={logs} 
+                        totalSteps={totalChapters} 
+                        currentStep={completedChapters}
+                        isComplete={state === AppState.COMPLETE}
+                        finalStats={finalResult ? { tokens: finalResult.totalTokens || 0, searchCount: finalResult.totalSearchQueries || 0 } : undefined}
+                        reportData={finalResult ? { title: finalResult.title, report: finalResult.report, sources: finalResult.sources } : undefined}
+                    />
                 </div>
 
                 {/* Resizer Handle */}
                 <div 
-                    className="w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-20 flex-none"
+                    className="w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-20 flex-none bg-editorial-border/30"
                     onMouseDown={(e) => {
                         isResizingSidebar.current = true;
                         document.body.style.cursor = 'col-resize';
@@ -362,7 +398,7 @@ const App: React.FC = () => {
                             {/* Live Preview Container */}
                             <div ref={previewRef} className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
                                 {accumulatedReport ? (
-                                    <div className="max-w-[800px] mx-auto p-12 md:p-16 bg-white shadow-editorial-lg min-h-screen my-8 border border-editorial-border/50">
+                                    <div className="max-w-full md:max-w-[210mm] mx-auto p-12 md:p-16 bg-white shadow-editorial-lg min-h-screen my-8 border border-editorial-border/50">
                                         <div className="prose prose-lg max-w-none font-serif text-editorial-text">
                                             <ReactMarkdown 
                                                 remarkPlugins={[remarkGfm]}
@@ -370,9 +406,12 @@ const App: React.FC = () => {
                                                     h1: ({node, ...props}) => <h1 className="font-serif text-3xl font-bold border-b border-editorial-border pb-4 mb-6 mt-8" {...props} />,
                                                     h2: ({node, ...props}) => <h2 className="font-serif text-2xl font-bold text-editorial-text mt-8 mb-4 pl-0" {...props} />,
                                                     p: ({node, ...props}) => <p className="font-sans text-editorial-text leading-relaxed mb-4 text-justify" {...props} />,
-                                                    table: ({node, ...props}) => <div className="overflow-x-auto my-8"><table className="w-full text-left border-collapse border-t-2 border-b-2 border-editorial-text" {...props} /></div>,
-                                                    th: ({node, ...props}) => <th className="p-3 bg-editorial-bg font-sans font-bold text-xs uppercase tracking-wider border-b border-editorial-border" {...props} />,
-                                                    td: ({node, ...props}) => <td className="p-3 border-b border-editorial-border font-sans text-sm" {...props} />,
+                                                    // Styling matched with ReportDisplay
+                                                    table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed" {...props} />,
+                                                    thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent" {...props} />,
+                                                    tr: ({node, ...props}) => <tr className="even:bg-[#FAFAF8] border-b border-editorial-border/30 last:border-0" {...props} />,
+                                                    th: ({node, ...props}) => <th className="p-3 font-serif font-bold text-sm uppercase tracking-wider text-editorial-text" {...props} />,
+                                                    td: ({node, ...props}) => <td className="p-3 font-sans text-sm text-editorial-text align-top" {...props} />,
                                                 }}
                                             >
                                                 {/* Strip citations for live preview clean look */}
@@ -392,20 +431,6 @@ const App: React.FC = () => {
 
                     {state === AppState.COMPLETE && finalResult && (
                         <div className="h-full w-full bg-[#F5F3F0] relative">
-                             {/* Prominent Completion Notice Overlay (fades out or stays at top) */}
-                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-slide-up">
-                                <div className="bg-editorial-text text-white px-6 py-3 rounded-full shadow-editorial-lg flex items-center gap-4">
-                                    <span className="text-xl">✅</span>
-                                    <div>
-                                        <div className="font-serif font-bold text-sm">研究任务已完成</div>
-                                        <div className="text-[10px] font-mono opacity-80 flex gap-3">
-                                            <span>消耗 Tokens: {finalResult.totalTokens?.toLocaleString() || 'N/A'}</span>
-                                            <span>搜索调用: {finalResult.totalSearchQueries || 0} 次</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
                             <ReportDisplay 
                                 title={finalResult.title}
                                 report={finalResult.report} 

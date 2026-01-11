@@ -201,6 +201,7 @@ export class DeepResearchService {
     this.initAI(settings);
     const model = settings.model || (settings.provider === 'google' ? 'gemini-3-pro-preview' : 'gpt-4o');
     const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    const currentYear = new Date().getFullYear();
     
     // Slightly increased chapter count for "Deep" default
     const chapterCount = config.depth === 1 ? 4 : config.depth === 2 ? 6 : 10;
@@ -216,6 +217,7 @@ export class DeepResearchService {
       3. **严禁包含“伦理考量”、“道德风险”或类似的章节**。请专注于技术、科学、经济或历史层面的深度。
       4. 逻辑流畅，层层递进。
       5. 输出必须完全使用简体中文。
+      6. **时效性**: 这是一个 ${currentYear} 年的研究。请确保章节设计能引导AI去挖掘 ${currentYear} 或 ${currentYear-1} 年的最新数据，而不是陈旧的历史数据。
       
       返回 JSON: { "title": "报告标题", "chapters": ["1. 绪论", "2. 文献综述...", ...] }
     `;
@@ -248,8 +250,7 @@ export class DeepResearchService {
   ): AsyncGenerator<ResearchLog> {
     this.initAI(settings); 
     const model = settings.model || (settings.provider === 'google' ? 'gemini-3-pro-preview' : 'gpt-4o');
-    const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-
+    
     const allSources: Source[] = [];
     const reportSections: string[] = [];
     const chapterFindingsCache: string[] = [];
@@ -272,7 +273,7 @@ export class DeepResearchService {
         id: crypto.randomUUID(),
         timestamp: Date.now(),
         type: 'info',
-        message: `正在攻克章节 ${i+1}/${chapters.length}: ${chapter}`
+        message: `正在编撰章节 ${i+1}/${chapters.length}: ${chapter}`
       };
 
       // A. Generate Queries
@@ -315,7 +316,7 @@ export class DeepResearchService {
       // C. Write Chapter
       yield { id: crypto.randomUUID(), timestamp: Date.now(), type: 'writing', message: `撰写: ${chapter}` };
       
-      const { content: chapterContent, usage: writeTokens } = await this.writeChapter(config.query, chapter, chapterFindings, chapterSources, model, currentDate);
+      const { content: chapterContent, usage: writeTokens } = await this.writeChapter(config.query, chapter, chapterFindings, chapterSources, model);
       totalTokens += writeTokens;
       reportSections.push(chapterContent);
 
@@ -352,13 +353,17 @@ export class DeepResearchService {
 
   // Helpers
   private async generateChapterQueries(topic: string, chapter: string, prevFindings: string[], model: string): Promise<{ queries: string[], usage: number }> {
+    const currentYear = new Date().getFullYear();
     const systemPrompt = "你是一个搜索专家。请返回JSON字符串数组。";
     const prompt = `
       主题: "${topic}"
       章节: "${chapter}"
+      当前年份: ${currentYear}
       前文背景: ${prevFindings.slice(-3).join('; ')}
       
       生成 3 个具体、高价值的搜索查询。
+      **重要**: 优先查询 ${currentYear} 年或 ${currentYear-1} 年的最新数据、报告和统计。
+      
       返回 JSON 数组: ["查询1", "查询2", "查询3"]
     `;
     try {
@@ -366,7 +371,7 @@ export class DeepResearchService {
       const cleanText = text.replace(/```json\n|\n```/g, '');
       return { queries: JSON.parse(cleanText), usage: usage || 0 };
     } catch {
-      return { queries: [`${topic} ${chapter} 数据`, `${topic} 统计`], usage: 0 };
+      return { queries: [`${topic} ${chapter} ${currentYear} 数据`, `${topic} 现状`], usage: 0 };
     }
   }
 
@@ -375,9 +380,11 @@ export class DeepResearchService {
     chapterTitle: string, 
     findings: string[], 
     sources: Source[],
-    model: string,
-    currentDate: string
+    model: string
   ): Promise<{ content: string, usage: number }> {
+    const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+    const currentYear = new Date().getFullYear();
+    
     const findingsText = findings.join('\n\n');
     const systemPrompt = `你是一位严谨的深度研究员。当前日期是 ${currentDate}。请用Markdown格式撰写。`;
     const prompt = `
@@ -390,12 +397,17 @@ export class DeepResearchService {
       任务: 撰写本章节内容。
       
       要求:
-      1. **学术语调**: 正式、客观、深度。简体中文。
-      2. **篇幅**: 详尽（约 800-1500 字）。
-      3. **可视化**: 必须包含一个 Mermaid.js 图表。
-      4. **表格**: 如有数据，使用Markdown表格。
-      5. **纯净文本**: **严禁**在正文中使用 [1]、[x] 等引用标记。正文应保持纯净阅读体验。
-      6. **时效性**: 基于 ${currentDate}。
+      1. **数据时效性**: 务必以 ${currentDate} 的视角进行写作。**严禁**使用过去的预测数据作为未来的预测（例如：如果现在是 ${currentYear} 年，不要说"预计 ${currentYear-1} 年达到..."，而应该寻找 ${currentYear-1} 年的实际数据）。如果材料中只有旧数据，必须明确指出数据的滞后性。
+      2. **学术语调**: 正式、客观、深度。简体中文。
+      3. **篇幅**: 详尽（约 800-1500 字）。
+      4. **可视化**: 必须包含一个 Mermaid.js 图表。
+         - **Mermaid 严格规范**:
+           - 节点文本必须使用双引号包裹，例如: A["文本内容"] --> B["另一文本"]
+           - 决策节点使用花括号，例如: C{"决策点"}
+           - 换行只使用 <br> 标签。
+           - 不要使用特殊字符或弯引号。
+      5. **表格**: 如有数据，使用Markdown表格。
+      6. **纯净文本**: **严禁**在正文中使用 [1]、[x] 等引用标记。正文应保持纯净阅读体验。
       
       直接输出 Markdown 内容。
     `;

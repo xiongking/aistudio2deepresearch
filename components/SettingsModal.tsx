@@ -8,56 +8,51 @@ interface SettingsModalProps {
   onSave: (settings: Settings) => void;
 }
 
+const PRESETS = [
+  { id: 'deepseek', name: 'DeepSeek (深度求索)', baseUrl: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  { id: 'zhipu', name: '智谱 AI (GLM-4)', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4' },
+  { id: 'minimax', name: 'MiniMax (海螺)', baseUrl: 'https://api.minimax.chat/v1', model: 'abab6.5-chat' },
+  { id: 'qwen', name: '通义千问 (Aliyun)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-turbo' },
+  { id: 'moonshot', name: 'Moonshot (Kimi)', baseUrl: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
+  { id: 'yi', name: '零一万物 (Yi)', baseUrl: 'https://api.lingyiwanwu.com/v1', model: 'yi-34b-chat-0205' },
+  { id: 'openai', name: 'OpenAI (GPT-4o)', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o' },
+];
+
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave }) => {
   const [formData, setFormData] = useState<Settings>(settings);
-  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('deepseek');
   const [loadingModels, setLoadingModels] = useState(false);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.provider === 'openai') {
+       if (!formData.baseUrl || !formData.apiKey || !formData.model || !formData.tavilyApiKey) {
+           alert("使用自定义/OpenAI兼容模式时，接口地址、API Key、模型 ID 和 Tavily Search API Key 均为必填项。");
+           return;
+       }
+    } else {
+        if (!formData.apiKey) {
+            alert("Google API Key 不能为空");
+            return;
+        }
+    }
     onSave(formData);
     onClose();
   };
 
-  const handleFetchModels = async () => {
-    if (!formData.apiKey) {
-      alert("请先输入 API Key");
-      return;
-    }
-    
-    setLoadingModels(true);
-    try {
-      // Logic for OpenAI compatible endpoint
-      const baseUrl = formData.baseUrl || "https://api.openai.com/v1";
-      const url = `${baseUrl.replace(/\/$/, '')}/models`;
-      
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${formData.apiKey}`
-        }
-      });
-      
-      if (!response.ok) throw new Error("Fetch failed");
-      
-      const data = await response.json();
-      if (data.data && Array.isArray(data.data)) {
-        const models = data.data.map((m: any) => m.id).sort();
-        setFetchedModels(models);
-        // If models found and current model not in list (or empty), select first
-        if (models.length > 0 && !models.includes(formData.model)) {
-          setFormData(prev => ({...prev, model: models[0]}));
-        }
-      } else {
-        alert("未能识别模型列表格式");
+  const handlePresetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const pid = e.target.value;
+      setSelectedPresetId(pid);
+      const preset = PRESETS.find(p => p.id === pid);
+      if (preset) {
+          setFormData(prev => ({
+              ...prev,
+              baseUrl: preset.baseUrl,
+              model: preset.model
+          }));
       }
-    } catch (e) {
-      alert("获取模型列表失败，请检查 Base URL 和 API Key");
-    } finally {
-      setLoadingModels(false);
-    }
   };
 
   const isGoogle = formData.provider === 'google';
@@ -69,142 +64,141 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
         onClick={onClose}
       ></div>
 
-      <div className="relative bg-white border border-editorial-border w-full max-w-lg shadow-editorial-lg animate-fade-in max-h-[90vh] overflow-y-auto">
+      <div className="relative bg-white border border-editorial-border w-full max-w-lg shadow-editorial-lg animate-fade-in max-h-[90vh] overflow-y-auto rounded-md">
         <div className="p-6 border-b border-editorial-border flex justify-between items-center bg-editorial-bg sticky top-0 z-10">
           <h2 className="font-serif text-xl font-bold text-editorial-text">系统配置</h2>
-          <button 
-            onClick={onClose}
-            className="text-editorial-subtext hover:text-editorial-text transition-colors"
-          >
+          <button onClick={onClose} className="text-editorial-subtext hover:text-editorial-text transition-colors">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-8">
           
-          <div className="space-y-4">
-            <label className="font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">AI 提供商</label>
+          {/* AI Provider Section */}
+          <div className="space-y-6">
+            <div className="flex items-center gap-2 mb-4">
+                <svg className="w-5 h-5 text-editorial-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                <h3 className="font-serif font-bold text-lg text-editorial-text">AI 模型提供商</h3>
+            </div>
+            
             <div className="grid grid-cols-2 gap-4">
+               <button
+                type="button"
+                onClick={() => setFormData({...formData, provider: 'openai'})}
+                className={`p-3 text-sm font-sans font-medium transition-all border rounded-md ${
+                  !isGoogle 
+                    ? 'bg-editorial-highlight border-editorial-accent text-editorial-text shadow-sm' 
+                    : 'bg-white border-editorial-border text-gray-400 hover:border-gray-300'
+                }`}
+              >
+                自定义 / OpenAI 兼容
+              </button>
               <button
                 type="button"
                 onClick={() => setFormData({...formData, provider: 'google', model: 'gemini-3-pro-preview', baseUrl: ''})}
-                className={`p-4 border text-sm font-sans font-medium transition-all ${
+                className={`p-3 text-sm font-sans font-medium transition-all border rounded-md ${
                   isGoogle 
-                    ? 'bg-editorial-bg border-editorial-accent text-editorial-text shadow-sm' 
+                    ? 'bg-editorial-highlight border-editorial-accent text-editorial-text shadow-sm' 
                     : 'bg-white border-editorial-border text-gray-400 hover:border-gray-300'
                 }`}
               >
                 Google Gemini
-                <span className="block text-xs font-serif italic mt-1 text-editorial-subtext">原生搜索支持</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData({...formData, provider: 'openai', model: 'gpt-4o', baseUrl: 'https://api.openai.com/v1'})}
-                className={`p-4 border text-sm font-sans font-medium transition-all ${
-                  !isGoogle 
-                    ? 'bg-editorial-bg border-editorial-accent text-editorial-text shadow-sm' 
-                    : 'bg-white border-editorial-border text-gray-400 hover:border-gray-300'
-                }`}
-              >
-                OpenAI 兼容
-                <span className="block text-xs font-serif italic mt-1 text-editorial-subtext">需配置搜索 API</span>
               </button>
             </div>
+
+            {!isGoogle && (
+                <div className="space-y-4 p-5 bg-gray-50 border border-editorial-border rounded-md">
+                    <div className="space-y-2">
+                        <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                            快速预设
+                        </label>
+                        <select 
+                            value={selectedPresetId}
+                            onChange={handlePresetChange}
+                            className="w-full bg-white border border-editorial-border px-3 py-2 text-editorial-text text-sm rounded focus:outline-none focus:border-editorial-accent"
+                        >
+                            {PRESETS.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                            接口地址 (Base URL) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.baseUrl}
+                            onChange={e => setFormData({...formData, baseUrl: e.target.value})}
+                            className="w-full bg-white border border-editorial-border px-3 py-2 text-editorial-text text-sm rounded focus:outline-none focus:border-editorial-accent font-mono"
+                        />
+                    </div>
+                    
+                    <div className="space-y-2">
+                        <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                            模型 ID (Model) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={formData.model}
+                            onChange={e => setFormData({...formData, model: e.target.value})}
+                            className="w-full bg-white border border-editorial-border px-3 py-2 text-editorial-text text-sm rounded focus:outline-none focus:border-editorial-accent font-mono"
+                        />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                        API Key <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="password"
+                        value={formData.apiKey}
+                        onChange={e => setFormData({...formData, apiKey: e.target.value})}
+                        placeholder="sk-..."
+                        className="w-full bg-white border border-editorial-border px-4 py-3 text-editorial-text rounded focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
+                        required
+                      />
+                    </div>
+                </div>
+            )}
+
+            {isGoogle && (
+               <div className="space-y-2">
+                  <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                    Google API Key <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.apiKey}
+                    onChange={e => setFormData({...formData, apiKey: e.target.value})}
+                    placeholder="AIza..."
+                    className="w-full bg-white border border-editorial-border px-4 py-3 text-editorial-text rounded focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
+                    required
+                  />
+               </div>
+            )}
           </div>
 
-          <div className="space-y-6">
-             {/* Base URL (Top for OpenAI context) */}
-            <div className="space-y-2">
-              <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                Base URL
-              </label>
-              <input
-                type="text"
-                value={formData.baseUrl}
-                onChange={e => setFormData({...formData, baseUrl: e.target.value})}
-                placeholder={isGoogle ? "默认 (Google API)" : "https://api.openai.com/v1"}
-                disabled={isGoogle}
-                className={`w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm ${isGoogle ? 'opacity-50 cursor-not-allowed' : ''}`}
-              />
+          {/* Search Provider Section */}
+          <div className="space-y-6 border-t-2 border-dashed border-editorial-border pt-8">
+             <div className="flex items-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <h3 className="font-serif font-bold text-lg text-editorial-text">搜索引擎提供商</h3>
             </div>
 
-            {/* API Key */}
             <div className="space-y-2">
-              <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                LLM API Key <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                value={formData.apiKey}
-                onChange={e => setFormData({...formData, apiKey: e.target.value})}
-                placeholder="LLM API Key"
-                className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
-                required
-              />
-            </div>
-
-            {/* Model Selection with Auto-Fetch */}
-            <div className="space-y-2">
-              <div className="flex justify-between items-end">
-                <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                   模型 ID
-                </label>
-                {!isGoogle && (
-                  <button 
-                    type="button" 
-                    onClick={handleFetchModels}
-                    disabled={loadingModels}
-                    className="text-xs text-editorial-accent hover:underline mb-1"
-                  >
-                    {loadingModels ? '获取中...' : '自动获取模型列表'}
-                  </button>
-                )}
-              </div>
-              <div className="relative">
-                <input
-                  type="text"
-                  list="model-suggestions"
-                  value={formData.model}
-                  onChange={e => setFormData({...formData, model: e.target.value})}
-                  placeholder="例如: gemini-3-pro-preview"
-                  className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
-                />
-                <datalist id="model-suggestions">
-                  {fetchedModels.length > 0 ? (
-                     fetchedModels.map(m => <option key={m} value={m} />)
-                  ) : isGoogle ? (
-                    <>
-                      <option value="gemini-3-pro-preview" />
-                      <option value="gemini-3-flash-preview" />
-                      <option value="gemini-2.0-flash-thinking-exp-01-21" />
-                    </>
-                  ) : (
-                    <>
-                      <option value="gpt-4o" />
-                      <option value="gpt-3.5-turbo" />
-                      <option value="deepseek-chat" />
-                    </>
-                  )}
-                </datalist>
-              </div>
-            </div>
-
-            {/* Tavily API Key Section - Moved to Bottom */}
-            <div className="space-y-2 pt-4 border-t border-editorial-border">
                <label className="flex items-center justify-between font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                  <span>Tavily Search API Key</span>
-                  {!isGoogle && <span className="text-editorial-accent text-[10px]">推荐配置</span>}
+                  <span>Tavily Search API Key {!isGoogle && <span className="text-red-500">*</span>}</span>
                </label>
                <input
                 type="password"
                 value={formData.tavilyApiKey || ''}
                 onChange={e => setFormData({...formData, tavilyApiKey: e.target.value})}
-                placeholder={isGoogle ? "可选 (覆盖原生搜索)" : "强烈推荐用于联网搜索"}
-                className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
+                placeholder="tvly-..."
+                className="w-full bg-white border border-editorial-border px-4 py-3 text-editorial-text rounded focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
               />
-              <p className="text-[10px] text-editorial-subtext font-sans mt-1">
-                {isGoogle ? "Google 模型通常自带搜索，但您可以配置 Tavily 以使用外部搜索。" : "OpenAI 模型无内置搜索。请提供 Tavily API Key 以启用联网研究能力。"}
-              </p>
+              {!isGoogle && <p className="text-[10px] text-editorial-subtext mt-1">自定义模式下，必须配置 Tavily 才能进行联网检索。</p>}
             </div>
           </div>
 
@@ -218,7 +212,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
              </button>
              <button
                type="submit"
-               className="px-8 py-2.5 bg-editorial-text text-white font-sans text-sm font-medium hover:bg-black transition-all shadow-md"
+               className="px-8 py-2.5 bg-editorial-text text-white font-sans text-sm font-medium hover:bg-black transition-all shadow-md rounded"
              >
                保存配置
              </button>
