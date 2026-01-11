@@ -6,7 +6,7 @@ interface LogStreamProps {
   totalSteps?: number;
   currentStep?: number;
   isComplete?: boolean;
-  finalStats?: { tokens: number; searchCount: number };
+  finalStats?: { tokens: number; searchCount: number; wordCount?: number };
   reportData?: { title: string; report: string; sources: Source[] };
 }
 
@@ -176,12 +176,12 @@ const LogStream: React.FC<LogStreamProps> = ({ logs, totalSteps = 0, currentStep
                   {config.icon}
               </div>
               
-              <div className="flex flex-col gap-2 pt-0.5">
+              <div className="flex flex-col gap-2 pt-0.5 w-full">
                 <div className="flex items-center justify-between">
                   <span className="font-serif text-base font-bold tracking-tight text-editorial-text">
                       {config.label}
                   </span>
-                  <span className="font-mono text-[10px] text-gray-400">
+                  <span className="font-mono text-[10px] text-gray-400 flex-none ml-2">
                     {new Date(log.timestamp).toLocaleTimeString([], {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'})}
                   </span>
                 </div>
@@ -200,7 +200,7 @@ const LogStream: React.FC<LogStreamProps> = ({ logs, totalSteps = 0, currentStep
 
                 {/* Sources Collapsible */}
                 {hasSources && (
-                    <div className="mt-2">
+                    <div className="mt-2 w-full">
                          <button 
                             onClick={() => toggleLog(log.id)}
                             className="flex items-center gap-2 px-3 py-1.5 bg-white border border-editorial-border rounded-md text-xs font-mono text-editorial-subtext hover:border-editorial-accent hover:text-editorial-text transition-all w-full"
@@ -209,14 +209,15 @@ const LogStream: React.FC<LogStreamProps> = ({ logs, totalSteps = 0, currentStep
                             <svg className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                          </button>
                          {isExpanded && (
-                             <div className="mt-2 space-y-1 bg-white p-2 rounded-md border border-editorial-border shadow-sm">
+                             <div className="mt-2 space-y-1 bg-white p-2 rounded-md border border-editorial-border shadow-sm w-full">
                                 {log.details.map((d: string, i: number) => {
                                   const match = d.match(/🔗 (.*?) - (http.*)/);
                                   if (match) {
                                     return (
-                                        <a key={i} href={match[2]} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-1.5 rounded hover:bg-editorial-highlight transition-colors group/link">
-                                        <img src={getFaviconUrl(match[2])} alt="" className="w-3.5 h-3.5 rounded-sm opacity-70 group-hover/link:opacity-100" />
-                                        <span className="text-xs font-sans text-editorial-text truncate underline decoration-transparent group-hover/link:decoration-editorial-border max-w-[200px]">{match[1]}</span>
+                                        <a key={i} href={match[2]} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-1.5 rounded hover:bg-editorial-highlight transition-colors group/link w-full">
+                                        <img src={getFaviconUrl(match[2])} alt="" className="w-3.5 h-3.5 rounded-sm opacity-70 group-hover/link:opacity-100 flex-none" />
+                                        {/* Allow text to wrap naturally if space permits, or truncate if narrow */}
+                                        <span className="text-xs font-sans text-editorial-text underline decoration-transparent group-hover/link:decoration-editorial-border break-words leading-tight">{match[1]}</span>
                                         </a>
                                     )
                                   }
@@ -262,6 +263,12 @@ const LogStream: React.FC<LogStreamProps> = ({ logs, totalSteps = 0, currentStep
                             <span>消耗 Tokens</span>
                             <span>{finalStats.tokens.toLocaleString()}</span>
                         </div>
+                        {finalStats.wordCount !== undefined && (
+                          <div className="flex justify-between text-xs font-mono text-editorial-subtext font-bold">
+                              <span>报告字数</span>
+                              <span>{finalStats.wordCount.toLocaleString()} 字</span>
+                          </div>
+                        )}
                     </div>
                     
                     {/* Download Section */}

@@ -26,6 +26,8 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
   
   // TOC Sidebar State
   const [isTocOpen, setIsTocOpen] = useState(false);
+  const [tocWidth, setTocWidth] = useState(320);
+  const isResizingToc = useRef(false);
 
   useEffect(() => {
     mermaid.initialize({
@@ -45,6 +47,28 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
     }, 100);
     return () => clearTimeout(timer);
   }, [processedReport]);
+
+  // TOC Resize Handler
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingToc.current) return;
+      const newWidth = window.innerWidth - e.clientX;
+      if (newWidth > 200 && newWidth < 600) {
+        setTocWidth(newWidth);
+      }
+    };
+    const handleMouseUp = () => {
+      isResizingToc.current = false;
+      document.body.style.cursor = 'default';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
 
   // Parse Headers for TOC (H1 -> H2 -> H3)
   useEffect(() => {
@@ -132,8 +156,8 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
       {/* Main Content Area */}
       <div className="flex-1 h-full relative overflow-y-auto custom-scrollbar flex flex-col items-center">
         
-        {/* Paper Container */}
-        <div id="report-container" className="w-full max-w-5xl bg-white shadow-xl my-10 px-12 py-16 md:px-20 md:py-24 animate-fade-in relative z-10 box-border min-h-screen rounded-sm">
+        {/* Paper Container - Removed Shadow and White Bg */}
+        <div id="report-container" className="w-full max-w-5xl my-10 px-12 py-16 md:px-20 md:py-24 animate-fade-in relative z-10 box-border min-h-screen">
           
           {/* Header - Date Only */}
           <div className="pb-4 mb-4 text-left border-b border-editorial-border">
@@ -157,19 +181,15 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
               components={{
-                // Markdown H1 is the main title, ensure it's not indented and left aligned
                 h1: ({node, ...props}) => <h1 className="text-4xl font-serif font-bold text-editorial-text mb-8 text-left !indent-0" {...props} />,
                 h2: ({node, ...props}) => <h2 className="text-2xl font-serif font-bold text-editorial-text mt-8 mb-4 text-left !indent-0 scroll-mt-24" {...props} />, 
                 h3: ({node, ...props}) => <h3 className="text-xl font-serif font-bold text-editorial-text mt-6 mb-3 text-left !indent-0 scroll-mt-24" {...props} />,
-                // Custom Table Styling (Zebra + Header Colors)
                 table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed !indent-0" {...props} />,
                 thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent" {...props} />,
                 tbody: ({node, ...props}) => <tbody {...props} />,
                 tr: ({node, ...props}) => <tr className="even:bg-[#FAFAF8] hover:bg-editorial-highlight/80 border-b border-editorial-border/30 last:border-0 transition-colors" {...props} />,
                 th: ({node, ...props}) => <th className="p-3 font-serif font-bold text-sm uppercase tracking-wider text-editorial-text !indent-0" {...props} />,
                 td: ({node, ...props}) => <td className="p-3 font-sans text-sm text-editorial-text align-top !indent-0" {...props} />,
-                
-                // Mermaid Rendering Fix: Render a DIV with class mermaid
                 code({node, className, children, ...props}) {
                   const match = /language-mermaid/.test(className || '')
                   if (match) {
@@ -203,14 +223,12 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                     <span className="font-mono text-editorial-subtext text-[10px] pt-1 w-5 text-right flex-none">[{i+1}]</span>
                     
                     <a href={s.uri} target="_blank" rel="noreferrer" className="group flex items-center gap-2 hover:bg-editorial-highlight px-2 rounded -ml-2 transition-colors max-w-full">
-                        {/* Compact Favicon */}
                         <img 
                           src={getFaviconUrl(s.uri)} 
                           alt="•" 
                           className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 flex-none" 
                           onError={(e) => { (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOViOUI5IiBzdHJva2Utd2lkdGg9IjIiPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjEwIi8+PC9zdmc+' }} 
                         />
-                        
                         <span className="font-serif text-editorial-text border-b border-transparent group-hover:border-editorial-accent group-hover:text-editorial-accent transition-all truncate leading-snug">
                             {s.title}
                         </span>
@@ -223,26 +241,36 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
         </div>
       </div>
 
-      {/* Side Marker TOC Toggle */}
+      {/* Side Marker TOC Toggle - Right Edge */}
       <button 
         onClick={() => setIsTocOpen(!isTocOpen)}
-        className={`fixed top-1/2 right-0 transform -translate-y-1/2 z-50 bg-white border border-r-0 border-editorial-border shadow-md py-3 pl-2 pr-1 rounded-l-md transition-all duration-300 hover:bg-editorial-highlight ${isTocOpen ? 'translate-x-full' : 'translate-x-0'}`}
-        title="显示/隐藏目录"
+        className={`fixed top-1/2 right-0 transform -translate-y-1/2 z-50 bg-white border border-editorial-border shadow-md py-3 pl-2 pr-1 rounded-l-md transition-all duration-300 group hover:bg-editorial-highlight`}
+        style={{ right: isTocOpen ? tocWidth : 0 }}
+        title={isTocOpen ? "收起目录" : "展开目录"}
       >
         <div className="writing-vertical-rl text-xs font-mono font-bold text-editorial-subtext tracking-widest uppercase flex items-center gap-2">
-           <span className="w-1 h-1 rounded-full bg-editorial-accent"></span>
-           目录
+           <span className="w-1 h-1 rounded-full bg-editorial-accent group-hover:scale-125 transition-transform"></span>
         </div>
       </button>
 
       {/* Right TOC Sidebar */}
       <div 
-        className={`fixed top-0 right-0 h-full bg-white/95 backdrop-blur shadow-2xl z-40 transition-transform duration-300 transform border-l border-editorial-border flex flex-col ${isTocOpen ? 'translate-x-0' : 'translate-x-full'}`}
-        style={{ width: '320px' }}
+        className={`fixed top-0 right-0 h-full bg-white/95 backdrop-blur shadow-2xl z-40 transition-[width] duration-300 border-l border-editorial-border flex flex-col`}
+        style={{ width: isTocOpen ? tocWidth : 0 }}
       >
+          {/* Resize Handle (Left edge of TOC) */}
+          <div 
+             className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-50 -ml-0.5"
+             onMouseDown={(e) => {
+                 isResizingToc.current = true;
+                 document.body.style.cursor = 'col-resize';
+                 e.preventDefault();
+             }}
+          />
+
           <div className="p-6 border-b border-editorial-border flex justify-between items-center bg-editorial-bg/50">
-            <h3 className="font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">报告结构</h3>
-            {/* Added Clear Close Button X */}
+            <h3 className="font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest whitespace-nowrap overflow-hidden">报告结构</h3>
+            {/* Simple Close Button */}
             <button 
                 onClick={() => setIsTocOpen(false)} 
                 className="p-2 rounded hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
@@ -252,7 +280,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-6 space-y-1 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-6 space-y-1 custom-scrollbar w-full">
             {toc.map((item) => (
                 <div key={item.id}>
                     <div className="flex items-center gap-1 group py-0.5">
@@ -263,10 +291,11 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                         )}
                         <button
                         onClick={() => handleScrollTo(item.id)}
-                        className={`block text-left text-sm transition-colors hover:text-editorial-accent leading-snug w-full ${item.children.length === 0 ? 'pl-5' : ''} ${
+                        className={`block text-left text-sm transition-colors hover:text-editorial-accent leading-snug w-full truncate ${item.children.length === 0 ? 'pl-5' : ''} ${
                             item.level === 1 ? 'font-serif font-bold text-editorial-text pt-2' :
                             item.level === 2 ? 'font-serif font-medium text-editorial-text/90 pl-1' : 'font-sans text-gray-500 pl-2 text-xs'
                         }`}
+                        title={item.text}
                         >
                         {item.text}
                         </button>
@@ -285,6 +314,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                                         <button
                                             onClick={() => handleScrollTo(child.id)}
                                             className={`block text-left text-xs transition-colors hover:text-editorial-accent py-1 w-full truncate ${child.children.length === 0 ? 'pl-5' : ''} ${child.level === 2 ? 'font-serif font-medium text-editorial-text/90' : 'text-gray-400'}`}
+                                            title={child.text}
                                         >
                                             {child.text}
                                         </button>
@@ -298,6 +328,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                                                     key={subChild.id}
                                                     onClick={() => handleScrollTo(subChild.id)}
                                                     className="block text-left text-[10px] text-gray-300 hover:text-editorial-accent py-0.5 w-full truncate"
+                                                    title={subChild.text}
                                                 >
                                                     {subChild.text}
                                                 </button>

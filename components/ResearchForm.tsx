@@ -10,11 +10,11 @@ interface ResearchFormProps {
 
 const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSettings, hasApiKey }) => {
   const [query, setQuery] = useState('');
-  const [depth, setDepth] = useState(3); // Default to Deep (3)
+  const [depth, setDepth] = useState<number | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (state !== AppState.IDLE || !query.trim()) return;
+    if (state !== AppState.IDLE || !query.trim() || !depth) return;
     if (!hasApiKey) {
       onOpenSettings();
       return;
@@ -25,12 +25,12 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
   const isIdle = state === AppState.IDLE;
 
   return (
-    <div className="w-full max-w-2xl mx-auto flex flex-col items-center relative z-20 px-4">
+    <div className="w-full max-w-3xl mx-auto flex flex-col items-center relative z-20 px-4">
       
       {/* Hero Title - Editorial Style */}
       <div className="text-center mb-16 animate-slide-up">
-        <h1 className="text-5xl md:text-7xl font-serif font-normal text-editorial-text mb-6 tracking-tight leading-none">
-          深度<span className="italic text-editorial-accent">研究</span>
+        <h1 className="text-6xl md:text-8xl font-sans font-black text-editorial-text mb-6 tracking-tight leading-none">
+          深度<span className="text-editorial-accent">研究</span>
         </h1>
         <div className="flex items-center justify-center gap-4 mb-2">
             <span className="h-px w-12 bg-editorial-accent"></span>
@@ -44,7 +44,7 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
         
         <form onSubmit={handleSubmit} className="relative group">
           
-          <div className="relative bg-white border border-editorial-border shadow-editorial-sm hover:shadow-editorial-md transition-all duration-300 p-2 pl-6 flex items-center gap-4 group-focus-within:border-editorial-accent group-focus-within:ring-1 group-focus-within:ring-editorial-accent rounded-lg">
+          <div className="relative bg-white border border-editorial-border shadow-editorial-sm hover:shadow-editorial-md transition-all duration-300 p-2 pl-4 flex items-center gap-2 group-focus-within:border-editorial-accent group-focus-within:ring-1 group-focus-within:ring-editorial-accent rounded-xl">
             
             <input
               type="text"
@@ -52,46 +52,49 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
               onChange={(e) => setQuery(e.target.value)}
               placeholder="请输入研究课题..."
               disabled={!isIdle}
-              className="flex-1 bg-transparent text-editorial-text text-lg font-sans py-4 placeholder-gray-400 focus:outline-none"
+              className="flex-1 bg-transparent text-editorial-text text-lg font-sans py-4 px-2 placeholder-gray-400 focus:outline-none"
             />
             
+            {/* Depth Selector inside Input */}
+            <div className="flex bg-editorial-bg rounded-lg p-1 gap-1 border border-editorial-border">
+               {[
+                 { lvl: 1, label: "简报" },
+                 { lvl: 2, label: "标准" },
+                 { lvl: 3, label: "深度" }
+               ].map((opt) => (
+                 <button
+                   key={opt.lvl}
+                   type="button"
+                   onClick={() => setDepth(opt.lvl)}
+                   className={`px-3 py-2 text-xs font-bold rounded-md transition-all ${
+                     depth === opt.lvl 
+                       ? 'bg-white text-editorial-accent shadow-sm' 
+                       : 'text-gray-400 hover:text-editorial-text'
+                   }`}
+                 >
+                   {opt.label}
+                 </button>
+               ))}
+            </div>
+
             <button
               type="submit"
-              disabled={!isIdle || !query.trim()}
-              className="px-8 py-3 bg-editorial-accent text-white font-serif tracking-wider font-medium hover:bg-editorial-accentLight transition-colors disabled:opacity-50 rounded-md"
+              disabled={!isIdle || !query.trim() || !depth}
+              className="px-8 py-3 bg-editorial-accent text-white font-bold tracking-wider hover:bg-editorial-accentLight transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm"
             >
                开始
             </button>
           </div>
+          
+          {/* Validation Message */}
+          {!depth && query.trim() && (
+             <div className="absolute -bottom-8 left-0 w-full text-center">
+                <span className="text-xs text-editorial-accent animate-pulse">请选择报告深度以继续</span>
+             </div>
+          )}
 
           {/* Controls */}
-          <div className="flex flex-wrap items-center justify-between mt-8 px-2 gap-4">
-            
-            {/* Depth Selection - Text Based */}
-            <div className="flex items-center gap-6">
-               <span className="font-mono text-xs uppercase tracking-widest text-gray-400">报告深度</span>
-               <div className="flex gap-4">
-                 {[
-                   { lvl: 1, label: "简报" },
-                   { lvl: 2, label: "标准" },
-                   { lvl: 3, label: "深度" }
-                 ].map((opt) => (
-                   <button
-                     key={opt.lvl}
-                     type="button"
-                     onClick={() => setDepth(opt.lvl)}
-                     className={`text-sm font-sans transition-all pb-0.5 border-b-2 ${
-                       depth === opt.lvl 
-                         ? 'text-editorial-accent border-editorial-accent font-medium' 
-                         : 'text-gray-400 border-transparent hover:text-editorial-text'
-                     }`}
-                   >
-                     {opt.label}
-                   </button>
-                 ))}
-               </div>
-            </div>
-            
+          <div className="flex flex-wrap items-center justify-end mt-4 px-2 gap-4">
             {/* Status Indicator */}
             <button 
               type="button" 

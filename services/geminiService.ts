@@ -330,9 +330,10 @@ export class DeepResearchService {
       };
     }
 
-    // 3. Final Compilation (NO REFERENCE LIST HERE)
+    // 3. Final Compilation
     const uniqueSources = Array.from(new Map(allSources.map(s => [s.uri, s])).values());
     const fullReport = `# ${title}\n\n` + reportSections.join('\n\n');
+    const wordCount = fullReport.replace(/\s+/g, '').length;
 
     yield {
       id: crypto.randomUUID(),
@@ -345,7 +346,8 @@ export class DeepResearchService {
           report: fullReport,
           sources: uniqueSources,
           totalSearchQueries: this.searchCount,
-          totalTokens: totalTokens
+          totalTokens: totalTokens,
+          wordCount: wordCount
         }
       }
     };

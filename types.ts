@@ -30,12 +30,13 @@ export interface ResearchResult {
   id: string; 
   timestamp: number; 
   title: string;
-  sections: string[]; 
-  fullReport: string; 
+  sections?: string[]; 
+  report: string; 
   sources: Source[];
   logs: ResearchLog[];
   totalSearchQueries?: number; // Track search usage
   totalTokens?: number; // Track total tokens
+  wordCount?: number; // Track word count
 }
 
 export enum AppState {

@@ -61,9 +61,10 @@ const App: React.FC = () => {
   const [pendingOutline, setPendingOutline] = useState<{ title: string, chapters: string[] } | null>(null);
   const [currentConfig, setCurrentConfig] = useState<ResearchConfig | null>(null);
 
-  // Sidebar Resizing State
-  const [sidebarWidth, setSidebarWidth] = useState(380);
-  const isResizingSidebar = useRef(false);
+  // Sidebar Resizing State (Left - Log Stream)
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState(380);
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(true);
+  const isResizingLeft = useRef(false);
 
   // Load settings
   const [settings, setSettings] = useState<Settings>(() => {
@@ -94,13 +95,13 @@ const App: React.FC = () => {
   // Split Pane Resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizingSidebar.current) return;
-      if (e.clientX > 250 && e.clientX < 600) {
-        setSidebarWidth(e.clientX);
+      if (!isResizingLeft.current) return;
+      if (e.clientX > 250 && e.clientX < 800) {
+        setLeftSidebarWidth(e.clientX);
       }
     };
     const handleMouseUp = () => {
-      isResizingSidebar.current = false;
+      isResizingLeft.current = false;
       document.body.style.cursor = 'default';
     };
     window.addEventListener('mousemove', handleMouseMove);
@@ -128,7 +129,7 @@ const App: React.FC = () => {
     setFinalResult(result);
     setLogs(result.logs || []);
     setReportTitle(result.title);
-    setCurrentConfig({ query: result.title, depth: 3, breadth: 3 }); // Approximate restore
+    setCurrentConfig({ query: result.title, depth: 3, breadth: 3 }); 
   };
 
   useEffect(() => {
@@ -257,6 +258,9 @@ const App: React.FC = () => {
     setCurrentConfig(null);
   };
 
+  // Determine if we show the sidebars based on state
+  const showSidebar = state === AppState.RESEARCHING || state === AppState.COMPLETE || state === AppState.ERROR;
+
   return (
     <div className="h-screen flex flex-col overflow-hidden font-sans selection:bg-editorial-accent/20 selection:text-editorial-text relative">
        
@@ -279,11 +283,15 @@ const App: React.FC = () => {
        <header className="flex-none flex justify-between items-center px-8 py-4 z-40 bg-editorial-bg border-b border-editorial-border">
            <div className="flex items-center gap-6">
               <div className="flex items-center gap-4 cursor-pointer group" onClick={handleReset}>
-                  <div className="w-8 h-8 flex items-center justify-center border border-editorial-text rounded-sm transition-all group-hover:bg-editorial-text group-hover:text-white">
-                      <span className="font-serif font-bold text-lg">D</span>
+                  {/* Brain Logo */}
+                  <div className="w-10 h-10 flex items-center justify-center text-editorial-text transition-transform group-hover:scale-110">
+                      <svg className="w-full h-full" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fillOpacity="0" />
+                        <path d="M18.3 8.3C17.9 6.4 16.4 4.8 14.5 4.3C14.1 4.2 13.6 4.6 13.7 5C13.8 5.4 14.3 5.6 14.7 5.5C16.1 5.8 17.2 7 17.5 8.5C17.6 8.9 18 9.1 18.4 9C18.8 8.9 19 8.5 18.9 8.1L18.3 8.3ZM12 2C13.6 2 15.1 2.4 16.5 3.2L16.2 4.1C14.9 3.4 13.5 3 12 3C8.6 3 5.6 4.9 4.1 7.7L3.2 7.2C5 3.9 8.3 2 12 2ZM6.5 17.5C5.1 16.1 4.2 14.2 4.2 12.1L3.2 12.1C3.2 14.5 4.3 16.7 5.9 18.2L6.5 17.5ZM12 22C14.6 22 17 21 18.7 19.3L18 18.6C16.5 20.1 14.3 21 12 21C9 21 6.3 19.5 4.8 17.1L4 17.6C5.7 20.3 8.7 22 12 22ZM20.8 12.1C20.8 13.8 20.2 15.4 19.3 16.8L20.1 17.4C21.2 15.8 21.8 13.9 21.8 12.1H20.8ZM16.5 6.5C15.8 5.8 14.9 5.3 13.9 5.1C13.5 5 13.2 5.3 13.3 5.7C13.4 6.1 13.8 6.3 14.2 6.4C14.9 6.5 15.6 6.9 16.1 7.4C16.4 7.7 16.8 7.7 17.1 7.4C17.4 7.1 17.4 6.7 17.1 6.4L16.5 6.5ZM7.5 7.5C7.8 7.2 7.8 6.8 7.5 6.5C7.2 6.2 6.8 6.2 6.5 6.5C5.6 7.4 5.1 8.6 5 9.9C5 10.3 5.3 10.6 5.7 10.6C6.1 10.6 6.4 10.3 6.4 9.9C6.5 9 6.9 8.1 7.5 7.5ZM13 13H11V7H13V13ZM13 17H11V15H13V17Z" />
+                      </svg>
                   </div>
                   <div className="flex flex-col">
-                      <span className="font-serif font-bold text-lg text-editorial-text leading-none tracking-tight">
+                      <span className="font-sans font-black text-xl text-editorial-text leading-none tracking-tight">
                         深度研究
                       </span>
                   </div>
@@ -362,56 +370,68 @@ const App: React.FC = () => {
           )}
 
           {/* ACTIVE RESEARCH & COMPLETE VIEW */}
-          {(state === AppState.RESEARCHING || state === AppState.COMPLETE || state === AppState.ERROR) && (
-            <div className="w-full h-full flex">
-                
-                {/* Sidebar (Log Stream) with Resize */}
+          {showSidebar && (
+            <>
+                {/* Left Sidebar (Log Stream) */}
                 <div 
-                  style={{ width: sidebarWidth }}
-                  className="flex-none bg-editorial-bg border-r border-editorial-border flex flex-col h-full"
+                  style={{ width: isLeftSidebarOpen ? leftSidebarWidth : 0 }}
+                  className={`flex-none bg-editorial-bg border-r border-editorial-border flex flex-col h-full transition-[width] duration-300 relative ${isLeftSidebarOpen ? 'overflow-visible' : 'overflow-hidden'}`}
                 >
-                    <LogStream 
-                        logs={logs} 
-                        totalSteps={totalChapters} 
-                        currentStep={completedChapters}
-                        isComplete={state === AppState.COMPLETE}
-                        finalStats={finalResult ? { tokens: finalResult.totalTokens || 0, searchCount: finalResult.totalSearchQueries || 0 } : undefined}
-                        reportData={finalResult ? { title: finalResult.title, report: finalResult.report, sources: finalResult.sources } : undefined}
-                    />
+                    <div className="h-full overflow-hidden w-full">
+                         <LogStream 
+                            logs={logs} 
+                            totalSteps={totalChapters} 
+                            currentStep={completedChapters}
+                            isComplete={state === AppState.COMPLETE}
+                            finalStats={finalResult ? { tokens: finalResult.totalTokens || 0, searchCount: finalResult.totalSearchQueries || 0, wordCount: finalResult.wordCount } : undefined}
+                            reportData={finalResult ? { title: finalResult.title, report: finalResult.report, sources: finalResult.sources } : undefined}
+                        />
+                    </div>
                 </div>
 
-                {/* Resizer Handle */}
-                <div 
-                    className="w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-20 flex-none bg-editorial-border/30"
-                    onMouseDown={(e) => {
-                        isResizingSidebar.current = true;
-                        document.body.style.cursor = 'col-resize';
-                        e.preventDefault();
-                    }}
-                ></div>
+                 {/* Left Sidebar Toggle (Fixed position when closed, or relative to sidebar when open) */}
+                 {state === AppState.COMPLETE && (
+                    <button
+                        onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
+                        className={`absolute z-30 top-1/2 transform -translate-y-1/2 bg-white border border-editorial-border shadow-md py-3 pr-2 pl-1 rounded-r-md hover:bg-editorial-highlight transition-all duration-300 group`}
+                        style={{ left: isLeftSidebarOpen ? leftSidebarWidth : 0 }}
+                        title={isLeftSidebarOpen ? "收起日志" : "展开日志"}
+                    >
+                        <div className="writing-vertical-lr text-xs font-mono font-bold text-editorial-subtext tracking-widest uppercase flex items-center gap-2">
+                             <span className="w-1 h-1 rounded-full bg-editorial-accent group-hover:scale-125 transition-transform"></span>
+                        </div>
+                    </button>
+                 )}
 
-                {/* Content Area */}
-                <div className="flex-1 bg-[#F5F3F0] overflow-hidden flex flex-col relative">
+                {/* Left Resizer Handle */}
+                {isLeftSidebarOpen && (
+                    <div 
+                        className="w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-20 flex-none bg-editorial-border/30 -ml-1"
+                        onMouseDown={(e) => {
+                            isResizingLeft.current = true;
+                            document.body.style.cursor = 'col-resize';
+                            e.preventDefault();
+                        }}
+                    ></div>
+                )}
+
+                {/* Center Content Area */}
+                <div className="flex-1 bg-[#F5F3F0] overflow-hidden flex flex-col relative justify-center">
                     
                     {state === AppState.RESEARCHING && (
                         <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                             {/* Live Preview Container */}
                             <div ref={previewRef} className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
                                 {accumulatedReport ? (
-                                    <div className="max-w-full md:max-w-[210mm] mx-auto p-12 md:p-16 bg-white shadow-editorial-lg min-h-screen my-8 border border-editorial-border/50">
+                                    <div className="max-w-5xl mx-auto p-12 md:p-16 bg-white min-h-screen my-8 border-none shadow-none">
                                         <div className="prose prose-lg max-w-none font-serif text-editorial-text">
                                             <ReactMarkdown 
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
                                                     h1: ({node, ...props}) => <h1 className="font-serif text-3xl font-bold border-b border-editorial-border pb-4 mb-6 mt-8" {...props} />,
                                                     h2: ({node, ...props}) => <h2 className="font-serif text-2xl font-bold text-editorial-text mt-8 mb-4 pl-0" {...props} />,
-                                                    p: ({node, ...props}) => <p className="font-sans text-editorial-text leading-relaxed mb-4 text-justify" {...props} />,
-                                                    // Styling matched with ReportDisplay
+                                                    p: ({node, ...props}) => <p className="font-sans text-editorial-text leading-relaxed mb-4 text-justify indent-8" {...props} />,
                                                     table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed" {...props} />,
-                                                    thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent" {...props} />,
-                                                    tr: ({node, ...props}) => <tr className="even:bg-[#FAFAF8] border-b border-editorial-border/30 last:border-0" {...props} />,
-                                                    th: ({node, ...props}) => <th className="p-3 font-serif font-bold text-sm uppercase tracking-wider text-editorial-text" {...props} />,
-                                                    td: ({node, ...props}) => <td className="p-3 font-sans text-sm text-editorial-text align-top" {...props} />,
                                                 }}
                                             >
                                                 {/* Strip citations for live preview clean look */}
@@ -430,7 +450,7 @@ const App: React.FC = () => {
                     )}
 
                     {state === AppState.COMPLETE && finalResult && (
-                        <div className="h-full w-full bg-[#F5F3F0] relative">
+                         <div className="h-full w-full bg-[#F5F3F0] relative overflow-hidden">
                             <ReportDisplay 
                                 title={finalResult.title}
                                 report={finalResult.report} 
@@ -457,7 +477,7 @@ const App: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </div>
+            </>
           )}
        </div>
     </div>
