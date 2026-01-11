@@ -34,6 +34,8 @@ export interface ResearchResult {
   fullReport: string; 
   sources: Source[];
   logs: ResearchLog[];
+  totalSearchQueries?: number; // Track search usage
+  totalTokens?: number; // Track total tokens
 }
 
 export enum AppState {

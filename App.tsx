@@ -57,6 +57,10 @@ const App: React.FC = () => {
   const [pendingOutline, setPendingOutline] = useState<{ title: string, chapters: string[] } | null>(null);
   const [currentConfig, setCurrentConfig] = useState<ResearchConfig | null>(null);
 
+  // Sidebar Resizing State
+  const [sidebarWidth, setSidebarWidth] = useState(380);
+  const isResizingSidebar = useRef(false);
+
   // Load settings
   const [settings, setSettings] = useState<Settings>(() => {
     const stored = localStorage.getItem('ds_settings');
@@ -81,6 +85,26 @@ const App: React.FC = () => {
         console.error("Failed to load history", e);
       }
     }
+  }, []);
+
+  // Split Pane Resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingSidebar.current) return;
+      if (e.clientX > 200 && e.clientX < 600) {
+        setSidebarWidth(e.clientX);
+      }
+    };
+    const handleMouseUp = () => {
+      isResizingSidebar.current = false;
+      document.body.style.cursor = 'default';
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
   }, []);
 
   const saveToHistory = (result: ResearchResult) => {
@@ -113,7 +137,6 @@ const App: React.FC = () => {
     localStorage.setItem('ds_settings', JSON.stringify(newSettings));
   };
 
-  // Step 1: Start -> Generate Outline
   const handleStartPlanning = async (config: ResearchConfig) => {
     setState(AppState.PLANNING);
     setCurrentConfig(config);
@@ -145,7 +168,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Step 2: Approve -> Execute Research
   const handleApproveOutline = async (title: string, chapters: string[]) => {
     if (!currentConfig) return;
     
@@ -154,7 +176,7 @@ const App: React.FC = () => {
     
     try {
       const generator = serviceRef.current.executeResearch(currentConfig, settings, title, chapters);
-      let currentLogs: ResearchLog[] = [...logs]; // Keep existing plan logs
+      let currentLogs: ResearchLog[] = [...logs]; 
 
       for await (const log of generator) {
         currentLogs.push(log);
@@ -248,6 +270,15 @@ const App: React.FC = () => {
            </div>
            
            <div className="flex items-center gap-6">
+              {/* Reset Button moved here */}
+              <button 
+                onClick={handleReset}
+                className="text-sm font-sans font-medium text-editorial-subtext hover:text-editorial-accent transition-colors flex items-center gap-2"
+              >
+                 <span className="w-4 h-4 border border-current rounded-full flex items-center justify-center text-[10px]">+</span>
+                 新研究
+              </button>
+              
               <button
                 onClick={() => setIsHistoryOpen(true)}
                 className="text-sm font-sans font-medium text-editorial-subtext hover:text-editorial-accent transition-colors flex items-center gap-2"
@@ -304,20 +335,34 @@ const App: React.FC = () => {
           {/* ACTIVE RESEARCH & COMPLETE VIEW */}
           {(state === AppState.RESEARCHING || state === AppState.COMPLETE || state === AppState.ERROR) && (
             <div className="w-full h-full flex">
-                {/* Sidebar (Log Stream) - Hidden on Complete if needed, or collapsed */}
-                <div className={`w-full lg:w-[320px] bg-editorial-bg border-r border-editorial-border flex flex-col transition-all duration-500 ${state === AppState.COMPLETE ? 'hidden lg:flex' : 'flex'}`}>
+                
+                {/* Sidebar (Log Stream) with Resize */}
+                <div 
+                  style={{ width: sidebarWidth }}
+                  className={`flex-none bg-editorial-bg border-r border-editorial-border flex flex-col ${state === AppState.COMPLETE ? '' : ''}`}
+                >
                     <LogStream logs={logs} />
                 </div>
 
+                {/* Resizer Handle */}
+                <div 
+                    className="w-1 cursor-col-resize hover:bg-editorial-accent/50 transition-colors z-20 flex-none"
+                    onMouseDown={(e) => {
+                        isResizingSidebar.current = true;
+                        document.body.style.cursor = 'col-resize';
+                        e.preventDefault();
+                    }}
+                ></div>
+
                 {/* Content Area */}
-                <div className={`flex-1 bg-[#F5F3F0] overflow-hidden flex flex-col relative ${state !== AppState.COMPLETE && 'hidden lg:flex'}`}>
+                <div className="flex-1 bg-[#F5F3F0] overflow-hidden flex flex-col relative">
                     
                     {state === AppState.RESEARCHING && (
-                        <div className="flex-1 flex flex-col h-full overflow-hidden">
+                        <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                             {/* Live Preview Container */}
                             <div ref={previewRef} className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
                                 {accumulatedReport ? (
-                                    <div className="max-w-4xl mx-auto p-12 md:p-16 bg-white shadow-editorial-lg min-h-screen my-8 border border-editorial-border/50">
+                                    <div className="max-w-[800px] mx-auto p-12 md:p-16 bg-white shadow-editorial-lg min-h-screen my-8 border border-editorial-border/50">
                                         <div className="prose prose-lg max-w-none font-serif text-editorial-text">
                                             <ReactMarkdown 
                                                 remarkPlugins={[remarkGfm]}
@@ -346,7 +391,21 @@ const App: React.FC = () => {
                     )}
 
                     {state === AppState.COMPLETE && finalResult && (
-                        <div className="h-full w-full bg-[#F5F3F0]">
+                        <div className="h-full w-full bg-[#F5F3F0] relative">
+                             {/* Prominent Completion Notice Overlay (fades out or stays at top) */}
+                            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-slide-up">
+                                <div className="bg-editorial-text text-white px-6 py-3 rounded-full shadow-editorial-lg flex items-center gap-4">
+                                    <span className="text-xl">✅</span>
+                                    <div>
+                                        <div className="font-serif font-bold text-sm">研究任务已完成</div>
+                                        <div className="text-[10px] font-mono opacity-80 flex gap-3">
+                                            <span>消耗 Tokens: {finalResult.totalTokens?.toLocaleString() || 'N/A'}</span>
+                                            <span>搜索调用: {finalResult.totalSearchQueries || 0} 次</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <ReportDisplay 
                                 title={finalResult.title}
                                 report={finalResult.report} 

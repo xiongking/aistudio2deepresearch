@@ -10,6 +10,8 @@ interface SettingsModalProps {
 
 const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings, onSave }) => {
   const [formData, setFormData] = useState<Settings>(settings);
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
 
   if (!isOpen) return null;
 
@@ -17,6 +19,45 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
     e.preventDefault();
     onSave(formData);
     onClose();
+  };
+
+  const handleFetchModels = async () => {
+    if (!formData.apiKey) {
+      alert("请先输入 API Key");
+      return;
+    }
+    
+    setLoadingModels(true);
+    try {
+      // Logic for OpenAI compatible endpoint
+      const baseUrl = formData.baseUrl || "https://api.openai.com/v1";
+      const url = `${baseUrl.replace(/\/$/, '')}/models`;
+      
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${formData.apiKey}`
+        }
+      });
+      
+      if (!response.ok) throw new Error("Fetch failed");
+      
+      const data = await response.json();
+      if (data.data && Array.isArray(data.data)) {
+        const models = data.data.map((m: any) => m.id).sort();
+        setFetchedModels(models);
+        // If models found and current model not in list (or empty), select first
+        if (models.length > 0 && !models.includes(formData.model)) {
+          setFormData(prev => ({...prev, model: models[0]}));
+        }
+      } else {
+        alert("未能识别模型列表格式");
+      }
+    } catch (e) {
+      alert("获取模型列表失败，请检查 Base URL 和 API Key");
+    } finally {
+      setLoadingModels(false);
+    }
   };
 
   const isGoogle = formData.provider === 'google';
@@ -28,8 +69,8 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
         onClick={onClose}
       ></div>
 
-      <div className="relative bg-white border border-editorial-border w-full max-w-lg shadow-editorial-lg animate-fade-in">
-        <div className="p-6 border-b border-editorial-border flex justify-between items-center bg-editorial-bg">
+      <div className="relative bg-white border border-editorial-border w-full max-w-lg shadow-editorial-lg animate-fade-in max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-editorial-border flex justify-between items-center bg-editorial-bg sticky top-0 z-10">
           <h2 className="font-serif text-xl font-bold text-editorial-text">系统配置</h2>
           <button 
             onClick={onClose}
@@ -72,38 +113,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-2">
-              <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                LLM API Key <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="password"
-                value={formData.apiKey}
-                onChange={e => setFormData({...formData, apiKey: e.target.value})}
-                placeholder="LLM API Key"
-                className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
-                required
-              />
-            </div>
-
-            {/* Tavily API Key Section - Show for OpenAI or if user wants to override */}
-            <div className="space-y-2">
-               <label className="flex items-center justify-between font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                  <span>Tavily Search API Key</span>
-                  {!isGoogle && <span className="text-editorial-accent text-[10px]">推荐配置</span>}
-               </label>
-               <input
-                type="password"
-                value={formData.tavilyApiKey || ''}
-                onChange={e => setFormData({...formData, tavilyApiKey: e.target.value})}
-                placeholder={isGoogle ? "可选 (覆盖原生搜索)" : "强烈推荐用于联网搜索"}
-                className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
-              />
-              <p className="text-[10px] text-editorial-subtext font-sans">
-                {isGoogle ? "Google 模型通常自带搜索，但您可以配置 Tavily 以使用外部搜索。" : "OpenAI 模型无内置搜索。请提供 Tavily API Key 以启用联网研究能力。"}
-              </p>
-            </div>
-
+             {/* Base URL (Top for OpenAI context) */}
             <div className="space-y-2">
               <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
                 Base URL
@@ -118,33 +128,83 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
               />
             </div>
 
+            {/* API Key */}
             <div className="space-y-2">
               <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                模型 ID
+                LLM API Key <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
-                list="model-suggestions"
-                value={formData.model}
-                onChange={e => setFormData({...formData, model: e.target.value})}
-                placeholder="例如: gemini-3-pro-preview"
+                type="password"
+                value={formData.apiKey}
+                onChange={e => setFormData({...formData, apiKey: e.target.value})}
+                placeholder="LLM API Key"
+                className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
+                required
+              />
+            </div>
+
+            {/* Model Selection with Auto-Fetch */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-end">
+                <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                   模型 ID
+                </label>
+                {!isGoogle && (
+                  <button 
+                    type="button" 
+                    onClick={handleFetchModels}
+                    disabled={loadingModels}
+                    className="text-xs text-editorial-accent hover:underline mb-1"
+                  >
+                    {loadingModels ? '获取中...' : '自动获取模型列表'}
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  list="model-suggestions"
+                  value={formData.model}
+                  onChange={e => setFormData({...formData, model: e.target.value})}
+                  placeholder="例如: gemini-3-pro-preview"
+                  className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
+                />
+                <datalist id="model-suggestions">
+                  {fetchedModels.length > 0 ? (
+                     fetchedModels.map(m => <option key={m} value={m} />)
+                  ) : isGoogle ? (
+                    <>
+                      <option value="gemini-3-pro-preview" />
+                      <option value="gemini-3-flash-preview" />
+                      <option value="gemini-2.0-flash-thinking-exp-01-21" />
+                    </>
+                  ) : (
+                    <>
+                      <option value="gpt-4o" />
+                      <option value="gpt-3.5-turbo" />
+                      <option value="deepseek-chat" />
+                    </>
+                  )}
+                </datalist>
+              </div>
+            </div>
+
+            {/* Tavily API Key Section - Moved to Bottom */}
+            <div className="space-y-2 pt-4 border-t border-editorial-border">
+               <label className="flex items-center justify-between font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                  <span>Tavily Search API Key</span>
+                  {!isGoogle && <span className="text-editorial-accent text-[10px]">推荐配置</span>}
+               </label>
+               <input
+                type="password"
+                value={formData.tavilyApiKey || ''}
+                onChange={e => setFormData({...formData, tavilyApiKey: e.target.value})}
+                placeholder={isGoogle ? "可选 (覆盖原生搜索)" : "强烈推荐用于联网搜索"}
                 className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
               />
-              <datalist id="model-suggestions">
-                {isGoogle ? (
-                  <>
-                    <option value="gemini-3-pro-preview" />
-                    <option value="gemini-3-flash-preview" />
-                    <option value="gemini-2.0-flash-thinking-exp-01-21" />
-                  </>
-                ) : (
-                  <>
-                    <option value="gpt-4o" />
-                    <option value="gpt-3.5-turbo" />
-                    <option value="deepseek-chat" />
-                  </>
-                )}
-              </datalist>
+              <p className="text-[10px] text-editorial-subtext font-sans mt-1">
+                {isGoogle ? "Google 模型通常自带搜索，但您可以配置 Tavily 以使用外部搜索。" : "OpenAI 模型无内置搜索。请提供 Tavily API Key 以启用联网研究能力。"}
+              </p>
             </div>
           </div>
 

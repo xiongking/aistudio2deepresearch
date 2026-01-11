@@ -7,6 +7,7 @@ export class DeepResearchService {
   private googleAI: GoogleGenAI | null = null;
   private settings: Settings | null = null;
   private cancelFlag: boolean = false;
+  private searchCount: number = 0; // Track local search count
 
   constructor() {}
 
@@ -107,6 +108,7 @@ export class DeepResearchService {
    * Tavily Search API
    */
   private async searchTavily(query: string, apiKey: string): Promise<{ summary: string; sources: Source[] }> {
+    this.searchCount++;
     try {
       const response = await fetch("https://api.tavily.com/search", {
         method: "POST",
@@ -147,9 +149,7 @@ export class DeepResearchService {
   private async search(query: string, model: string): Promise<{ summary: string; sources: Source[] }> {
     if (!this.settings) throw new Error("设置未初始化");
 
-    // 1. Tavily Search (First Priority if Key Exists and not using Google's native tool implicitly, or if user explicitly wants it)
-    // Here logic: If not Google Provider AND Tavily Key exists, use Tavily.
-    // Or even if Google Provider but Tavily is preferred? Let's stick to "OpenAI compatible -> use Tavily" rule primarily.
+    // 1. Tavily Search
     if (this.settings.provider !== 'google' && this.settings.tavilyApiKey) {
        return this.searchTavily(query, this.settings.tavilyApiKey);
     }
@@ -246,13 +246,15 @@ export class DeepResearchService {
     title: string, 
     chapters: string[]
   ): AsyncGenerator<ResearchLog> {
-    this.initAI(settings); // Re-init in case settings changed or context lost
+    this.initAI(settings); 
     const model = settings.model || (settings.provider === 'google' ? 'gemini-3-pro-preview' : 'gpt-4o');
     const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 
     const allSources: Source[] = [];
     const reportSections: string[] = [];
     const chapterFindingsCache: string[] = [];
+    let totalTokens = 0;
+    this.searchCount = 0;
 
     // Yield initial info
     yield {
@@ -275,6 +277,7 @@ export class DeepResearchService {
 
       // A. Generate Queries
       const { queries, usage: queryTokens } = await this.generateChapterQueries(config.query, chapter, chapterFindingsCache, model);
+      totalTokens += queryTokens;
       
       // B. Search
       const chapterFindings: string[] = [];
@@ -313,6 +316,7 @@ export class DeepResearchService {
       yield { id: crypto.randomUUID(), timestamp: Date.now(), type: 'writing', message: `撰写: ${chapter}` };
       
       const { content: chapterContent, usage: writeTokens } = await this.writeChapter(config.query, chapter, chapterFindings, chapterSources, model, currentDate);
+      totalTokens += writeTokens;
       reportSections.push(chapterContent);
 
       yield {
@@ -325,9 +329,9 @@ export class DeepResearchService {
       };
     }
 
-    // 3. Final Compilation
+    // 3. Final Compilation (NO REFERENCE LIST HERE)
     const uniqueSources = Array.from(new Map(allSources.map(s => [s.uri, s])).values());
-    const fullReport = `# ${title}\n\n` + reportSections.join('\n\n') + `\n\n## 参考文献与引用\n` + uniqueSources.map((s,i) => `[${i+1}] ${s.title}: ${s.uri}`).join('\n');
+    const fullReport = `# ${title}\n\n` + reportSections.join('\n\n');
 
     yield {
       id: crypto.randomUUID(),
@@ -338,7 +342,9 @@ export class DeepResearchService {
         completedResult: {
           title: title,
           report: fullReport,
-          sources: uniqueSources
+          sources: uniqueSources,
+          totalSearchQueries: this.searchCount,
+          totalTokens: totalTokens
         }
       }
     };
@@ -388,7 +394,7 @@ export class DeepResearchService {
       2. **篇幅**: 详尽（约 800-1500 字）。
       3. **可视化**: 必须包含一个 Mermaid.js 图表。
       4. **表格**: 如有数据，使用Markdown表格。
-      5. **纯净文本**: **严禁**在正文中使用 [1]、[x] 等引用标记。正文应保持纯净阅读体验。所有引用源将自动汇总于文末。
+      5. **纯净文本**: **严禁**在正文中使用 [1]、[x] 等引用标记。正文应保持纯净阅读体验。
       6. **时效性**: 基于 ${currentDate}。
       
       直接输出 Markdown 内容。
