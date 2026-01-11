@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>深度研究 // Deep Research</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html-docx-js-typescript@0.1.5/dist/index.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400;500&family=Cinzel:wght@400;600&family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --bg-color: #050505;
+        --text-primary: #e5e5e5;
+        --border-color: rgba(255, 255, 255, 0.08);
+      }
+      body {
+        font-family: 'Inter', 'Noto Serif SC', sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-primary);
+        overflow-x: hidden;
+      }
+      .font-mono { font-family: 'JetBrains Mono', monospace; }
+      .font-serif { font-family: 'Cinzel', 'Noto Serif SC', serif; }
+      
+      /* Deep Space Background */
+      .bg-nebula {
+        background-color: #020202;
+        background-image: 
+          radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.3) 0%, transparent 45%),
+          radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.08) 0%, transparent 25%),
+          radial-gradient(circle at 15% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 25%);
+        min-height: 100vh;
+      }
+
+      /* Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+      
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+      /* Superscript Styling */
+      sup {
+        color: #60a5fa;
+        font-weight: bold;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.75em;
+        margin-left: 2px;
+      }
+
+      /* Markdown Table Styling - UI Dark Mode */
+      .prose table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin: 2.5rem 0;
+        font-size: 0.9em;
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+      }
+      .prose th {
+        background-color: rgba(255,255,255,0.05);
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 1.25rem;
+        text-align: left;
+        font-weight: 600;
+        color: #fff;
+        font-family: 'Inter', sans-serif;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .prose td {
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 1.25rem;
+        color: #d4d4d8;
+      }
+      .prose tr:last-child td { border-bottom: none; }
+      
+      /* Export Mode (PDF/Word) */
+      #report-content.export-mode {
+        background: white !important;
+        color: black !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+      }
+      #report-content.export-mode .prose { color: black !important; max-width: 100% !important; }
+      #report-content.export-mode h1, #report-content.export-mode h2, #report-content.export-mode h3 {
+        color: #000 !important;
+        font-family: 'Times New Roman', serif !important;
+        page-break-after: avoid;
+      }
+      #report-content.export-mode p {
+        color: #000 !important;
+        font-family: 'Times New Roman', serif !important;
+        text-align: justify;
+      }
+      #report-content.export-mode table { border: 1px solid #000 !important; width: 100% !important; }
+      #report-content.export-mode th { background-color: #f3f4f6 !important; border: 1px solid #000 !important; color: #000 !important; }
+      #report-content.export-mode td { border: 1px solid #000 !important; color: #000 !important; }
+      #report-content.export-mode a { color: #0000EE !important; text-decoration: underline !important; }
+      #report-content.export-mode .mermaid { background: none !important; border: none !important; margin: 20px auto !important; }
+      #report-content.export-mode sup { color: #000 !important; }
+    </style>
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+        "react/": "https://esm.sh/react@^19.2.3/",
+        "react": "https://esm.sh/react@^19.2.3",
+        "react-markdown": "https://esm.sh/react-markdown@^9.0.1",
+        "remark-gfm": "https://esm.sh/remark-gfm@^4.0.0",
+        "rehype-raw": "https://esm.sh/rehype-raw@^7.0.0",
+        "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

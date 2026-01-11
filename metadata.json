@@ -1,0 +1,5 @@
+{
+  "name": "DeepSeeker 深度研究",
+  "description": "一个基于 AI 的深度研究代理，利用 Google Gemini 迭代搜索、分析并将复杂主题综合成全面的中文学术报告。",
+  "requestFramePermissions": []
+}
