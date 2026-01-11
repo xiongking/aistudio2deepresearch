@@ -10,11 +10,11 @@ interface ResearchFormProps {
 
 const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSettings, hasApiKey }) => {
   const [query, setQuery] = useState('');
-  const [depth, setDepth] = useState(2);
+  const [depth, setDepth] = useState(3); // Default to Deep (3)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (state === AppState.RESEARCHING || !query.trim()) return;
+    if (state !== AppState.IDLE || !query.trim()) return;
     if (!hasApiKey) {
       onOpenSettings();
       return;
@@ -22,7 +22,7 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
     onStart({ query, depth, breadth: 3 });
   };
 
-  const isResearching = state === AppState.RESEARCHING;
+  const isIdle = state === AppState.IDLE;
 
   return (
     <div className="w-full max-w-2xl mx-auto flex flex-col items-center relative z-20 px-4">
@@ -32,18 +32,15 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
         <h1 className="text-5xl md:text-7xl font-serif font-normal text-editorial-text mb-6 tracking-tight leading-none">
           深度<span className="italic text-editorial-accent">研究</span>
         </h1>
-        <div className="flex items-center justify-center gap-4 mb-6">
+        <div className="flex items-center justify-center gap-4 mb-2">
             <span className="h-px w-12 bg-editorial-accent"></span>
             <span className="font-mono text-xs uppercase tracking-[0.2em] text-editorial-subtext">Deep Research Agent</span>
             <span className="h-px w-12 bg-editorial-accent"></span>
         </div>
-        <p className="text-editorial-subtext font-serif italic text-xl max-w-lg mx-auto leading-relaxed">
-          您的个人学术研究助理。基于实时数据，为您生成博士级深度分析报告。
-        </p>
       </div>
 
-      {/* Input Module - Minimalist Box */}
-      <div className={`w-full transform transition-all duration-700 ease-out ${isResearching ? 'opacity-0 translate-y-8 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
+      {/* Input Module */}
+      <div className={`w-full transform transition-all duration-700 ease-out ${!isIdle ? 'opacity-0 translate-y-8 pointer-events-none' : 'opacity-100 translate-y-0'}`}>
         
         <form onSubmit={handleSubmit} className="relative group">
           
@@ -54,13 +51,13 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="请输入研究课题..."
-              disabled={isResearching}
+              disabled={!isIdle}
               className="flex-1 bg-transparent text-editorial-text text-lg font-sans py-4 placeholder-gray-400 focus:outline-none"
             />
             
             <button
               type="submit"
-              disabled={isResearching || !query.trim()}
+              disabled={!isIdle || !query.trim()}
               className="px-8 py-3 bg-editorial-accent text-white font-serif tracking-wider font-medium hover:bg-editorial-accentLight transition-colors disabled:opacity-50 rounded-md"
             >
                开始

@@ -6,8 +6,42 @@ import LogStream from './components/LogStream';
 import ReportDisplay from './components/ReportDisplay';
 import SettingsModal from './components/SettingsModal';
 import HistoryDrawer from './components/HistoryDrawer';
+import OutlineEditor from './components/OutlineEditor';
 import { DeepResearchService } from './services/geminiService';
 import { ResearchConfig, ResearchLog, ResearchResult, AppState, Settings } from './types';
+
+// Dynamic Loading Component
+const ResearchLoader = ({ logs }: { logs: ResearchLog[] }) => {
+  const [dots, setDots] = useState('.');
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots(prev => prev.length >= 3 ? '.' : prev + '.');
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const lastLog = logs[logs.length - 1];
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center p-12">
+      <div className="relative w-24 h-24 mb-8">
+         <div className="absolute inset-0 border-4 border-editorial-border rounded-full opacity-20"></div>
+         <div className="absolute inset-0 border-4 border-t-editorial-accent border-r-transparent border-b-transparent border-l-transparent rounded-full animate-spin"></div>
+         <div className="absolute inset-4 border-2 border-dashed border-gray-300 rounded-full animate-spin-slow opacity-50"></div>
+      </div>
+      <h3 className="font-serif text-2xl text-editorial-text mb-2 animate-pulse">
+        {lastLog?.type === 'search' ? '正在全网检索数据' : 
+         lastLog?.type === 'writing' ? '正在撰写章节内容' : 
+         lastLog?.type === 'analysis' ? '正在分析信息源' : '深度研究进行中'}
+        {dots}
+      </h3>
+      <p className="font-mono text-xs text-editorial-subtext tracking-widest uppercase">
+        {lastLog?.message || '初始化研究代理...'}
+      </p>
+    </div>
+  );
+};
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(AppState.IDLE);
@@ -19,6 +53,10 @@ const App: React.FC = () => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ResearchResult[]>([]);
   
+  // Interim State for Outline Approval
+  const [pendingOutline, setPendingOutline] = useState<{ title: string, chapters: string[] } | null>(null);
+  const [currentConfig, setCurrentConfig] = useState<ResearchConfig | null>(null);
+
   // Load settings
   const [settings, setSettings] = useState<Settings>(() => {
     const stored = localStorage.getItem('ds_settings');
@@ -75,25 +113,53 @@ const App: React.FC = () => {
     localStorage.setItem('ds_settings', JSON.stringify(newSettings));
   };
 
-  const handleStartResearch = async (config: ResearchConfig) => {
-    setState(AppState.RESEARCHING);
-    setLogs([]);
+  // Step 1: Start -> Generate Outline
+  const handleStartPlanning = async (config: ResearchConfig) => {
+    setState(AppState.PLANNING);
+    setCurrentConfig(config);
+    setLogs([{
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      type: 'plan',
+      message: '正在构建研究架构...'
+    }]);
     setAccumulatedReport('');
     setFinalResult(null);
 
     try {
-      const generator = serviceRef.current.startResearch(config, settings);
+      const { title, chapters, usage } = await serviceRef.current.generateResearchPlan(config, settings);
       
-      let currentLogs: ResearchLog[] = [];
+      setPendingOutline({ title, chapters });
+      setReportTitle(title);
+      setLogs(prev => [...prev, {
+        id: crypto.randomUUID(),
+        timestamp: Date.now(),
+        type: 'plan',
+        message: '大纲已生成，等待确认',
+        tokenCount: usage
+      }]);
+      setState(AppState.OUTLINE_APPROVAL);
+      
+    } catch (error: any) {
+      handleError(error);
+    }
+  };
+
+  // Step 2: Approve -> Execute Research
+  const handleApproveOutline = async (title: string, chapters: string[]) => {
+    if (!currentConfig) return;
+    
+    setState(AppState.RESEARCHING);
+    setReportTitle(title);
+    
+    try {
+      const generator = serviceRef.current.executeResearch(currentConfig, settings, title, chapters);
+      let currentLogs: ResearchLog[] = [...logs]; // Keep existing plan logs
 
       for await (const log of generator) {
         currentLogs.push(log);
         setLogs(prev => [...prev, log]);
         
-        if (log.type === 'plan' && log.message.startsWith('核心架构已生成:')) {
-            setReportTitle(log.message.replace('核心架构已生成: ', ''));
-        }
-
         if (log.type === 'info' && log.details?.partialSection) {
             setAccumulatedReport(prev => prev + '\n\n' + log.details.partialSection);
         }
@@ -112,28 +178,39 @@ const App: React.FC = () => {
       
       setState(AppState.COMPLETE);
     } catch (error: any) {
-      console.error("Research failed", error);
-      
-      let errMsg = error.message || "未知错误";
-      if (errMsg.includes("429") || errMsg.includes("quota")) {
-        errMsg = "API 配额已耗尽 (429)。请在设置中检查您的 API 密钥。";
-      }
-
-      setLogs(prev => [...prev, {
-        id: crypto.randomUUID(),
-        timestamp: Date.now(),
-        type: 'error',
-        message: `中断: ${errMsg}`
-      }]);
-      setState(AppState.ERROR);
+      handleError(error);
     }
   };
+
+  const handleCancelOutline = () => {
+    setState(AppState.IDLE);
+    setLogs([]);
+    setCurrentConfig(null);
+    setPendingOutline(null);
+  };
+
+  const handleError = (error: any) => {
+    console.error("Research failed", error);
+    let errMsg = error.message || "未知错误";
+    if (errMsg.includes("429") || errMsg.includes("quota")) {
+      errMsg = "API 配额已耗尽 (429)。请在设置中检查您的 API 密钥。";
+    }
+
+    setLogs(prev => [...prev, {
+      id: crypto.randomUUID(),
+      timestamp: Date.now(),
+      type: 'error',
+      message: `中断: ${errMsg}`
+    }]);
+    setState(AppState.ERROR);
+  }
 
   const handleReset = () => {
     setState(AppState.IDLE);
     setLogs([]);
     setAccumulatedReport('');
     setFinalResult(null);
+    setPendingOutline(null);
   };
 
   return (
@@ -154,7 +231,7 @@ const App: React.FC = () => {
          onDelete={deleteHistoryItem}
        />
 
-       {/* Top Navigation - Classical Header */}
+       {/* Top Navigation */}
        <header className="flex-none flex justify-between items-center px-8 py-5 z-40 bg-editorial-bg border-b border-editorial-border">
            <div className="flex items-center gap-4 cursor-pointer group" onClick={handleReset}>
                <div className="w-8 h-8 flex items-center justify-center border border-editorial-text rounded-sm transition-all group-hover:bg-editorial-text group-hover:text-white">
@@ -197,7 +274,7 @@ const App: React.FC = () => {
           {state === AppState.IDLE && (
             <div className="absolute inset-0 flex items-center justify-center p-6 bg-editorial-bg">
                 <ResearchForm 
-                  onStart={handleStartResearch} 
+                  onStart={handleStartPlanning} 
                   state={state} 
                   onOpenSettings={() => setIsSettingsOpen(true)}
                   hasApiKey={!!settings.apiKey}
@@ -205,64 +282,71 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* ACTIVE VIEW */}
-          {state !== AppState.IDLE && (
+          {/* PLANNING / APPROVAL VIEW */}
+          {(state === AppState.PLANNING || state === AppState.OUTLINE_APPROVAL) && (
+            <div className="absolute inset-0 flex items-center justify-center bg-editorial-bg z-20 overflow-y-auto">
+               {state === AppState.PLANNING ? (
+                  <div className="flex flex-col items-center">
+                    <div className="w-16 h-16 border-4 border-editorial-border border-t-editorial-accent rounded-full animate-spin mb-6"></div>
+                    <p className="font-serif text-lg text-editorial-text animate-pulse">正在构建研究架构...</p>
+                  </div>
+               ) : (
+                  <OutlineEditor 
+                    initialTitle={pendingOutline?.title || ''}
+                    initialChapters={pendingOutline?.chapters || []}
+                    onConfirm={handleApproveOutline}
+                    onCancel={handleCancelOutline}
+                  />
+               )}
+            </div>
+          )}
+
+          {/* ACTIVE RESEARCH & COMPLETE VIEW */}
+          {(state === AppState.RESEARCHING || state === AppState.COMPLETE || state === AppState.ERROR) && (
             <div className="w-full h-full flex">
-                {/* Sidebar (Log Stream) - Fixed width, border right */}
-                <div className={`w-full lg:w-[380px] bg-editorial-bg border-r border-editorial-border flex flex-col transition-all duration-500 ${state === AppState.COMPLETE ? 'hidden lg:flex' : 'flex'}`}>
+                {/* Sidebar (Log Stream) - Hidden on Complete if needed, or collapsed */}
+                <div className={`w-full lg:w-[320px] bg-editorial-bg border-r border-editorial-border flex flex-col transition-all duration-500 ${state === AppState.COMPLETE ? 'hidden lg:flex' : 'flex'}`}>
                     <LogStream logs={logs} />
                 </div>
 
-                {/* Content Area - Scrollable paper */}
+                {/* Content Area */}
                 <div className={`flex-1 bg-[#F5F3F0] overflow-hidden flex flex-col relative ${state !== AppState.COMPLETE && 'hidden lg:flex'}`}>
                     
                     {state === AppState.RESEARCHING && (
                         <div className="flex-1 flex flex-col h-full overflow-hidden">
-                            <div className="flex-none px-12 py-4 bg-white border-b border-editorial-border flex justify-between items-center">
-                                <div className="flex items-center gap-3">
-                                  <div className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-editorial-accent opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-editorial-accent"></span>
-                                  </div>
-                                  <span className="font-mono text-xs font-medium uppercase tracking-widest text-editorial-subtext">正在撰写报告初稿...</span>
-                                </div>
-                            </div>
-
-                            <div ref={previewRef} className="flex-1 overflow-y-auto p-8 md:p-16 scroll-smooth bg-white max-w-5xl mx-auto w-full shadow-editorial-lg my-8">
+                            {/* Live Preview Container */}
+                            <div ref={previewRef} className="flex-1 overflow-y-auto custom-scrollbar scroll-smooth">
                                 {accumulatedReport ? (
-                                    <div className="prose prose-lg max-w-none font-serif text-editorial-text">
-                                        <ReactMarkdown 
-                                            remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                h1: ({node, ...props}) => <h1 className="font-serif text-3xl font-bold border-b border-editorial-border pb-4 mb-6 mt-8" {...props} />,
-                                                h2: ({node, ...props}) => <h2 className="font-serif text-2xl font-bold text-editorial-text mt-8 mb-4 pl-0" {...props} />,
-                                                p: ({node, ...props}) => <p className="font-sans text-editorial-text leading-relaxed mb-4 text-justify" {...props} />,
-                                                table: ({node, ...props}) => <div className="overflow-x-auto my-8"><table className="w-full text-left border-collapse border-t-2 border-b-2 border-editorial-text" {...props} /></div>,
-                                                th: ({node, ...props}) => <th className="p-3 bg-editorial-bg font-sans font-bold text-xs uppercase tracking-wider border-b border-editorial-border" {...props} />,
-                                                td: ({node, ...props}) => <td className="p-3 border-b border-editorial-border font-sans text-sm" {...props} />,
-                                                sup: ({node, ...props}) => <sup className="text-editorial-accent font-bold ml-0.5 font-sans" {...props} />
-                                            }}
-                                        >
-                                            {accumulatedReport.replace(/\[([0-9]+)\]/g, '<sup>[$1]</sup>')}
-                                        </ReactMarkdown>
-                                        <div className="h-24 mt-8 flex justify-center">
-                                            <div className="w-1.5 h-1.5 bg-editorial-accent rounded-full animate-bounce"></div>
-                                            <div className="w-1.5 h-1.5 bg-editorial-accent rounded-full animate-bounce delay-100 mx-1"></div>
-                                            <div className="w-1.5 h-1.5 bg-editorial-accent rounded-full animate-bounce delay-200"></div>
+                                    <div className="max-w-4xl mx-auto p-12 md:p-16 bg-white shadow-editorial-lg min-h-screen my-8 border border-editorial-border/50">
+                                        <div className="prose prose-lg max-w-none font-serif text-editorial-text">
+                                            <ReactMarkdown 
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    h1: ({node, ...props}) => <h1 className="font-serif text-3xl font-bold border-b border-editorial-border pb-4 mb-6 mt-8" {...props} />,
+                                                    h2: ({node, ...props}) => <h2 className="font-serif text-2xl font-bold text-editorial-text mt-8 mb-4 pl-0" {...props} />,
+                                                    p: ({node, ...props}) => <p className="font-sans text-editorial-text leading-relaxed mb-4 text-justify" {...props} />,
+                                                    table: ({node, ...props}) => <div className="overflow-x-auto my-8"><table className="w-full text-left border-collapse border-t-2 border-b-2 border-editorial-text" {...props} /></div>,
+                                                    th: ({node, ...props}) => <th className="p-3 bg-editorial-bg font-sans font-bold text-xs uppercase tracking-wider border-b border-editorial-border" {...props} />,
+                                                    td: ({node, ...props}) => <td className="p-3 border-b border-editorial-border font-sans text-sm" {...props} />,
+                                                }}
+                                            >
+                                                {/* Strip citations for live preview clean look */}
+                                                {accumulatedReport.replace(/\[([0-9]+)\]/g, '')}
+                                            </ReactMarkdown>
+                                        </div>
+                                        <div className="h-32 flex items-center justify-center mt-12 border-t border-dashed border-editorial-border">
+                                            <p className="text-xs font-mono text-editorial-subtext animate-pulse">正在撰写后续内容...</p>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center space-y-6 opacity-50">
-                                        <div className="w-12 h-12 border-2 border-editorial-border rounded-full border-t-editorial-accent animate-spin"></div>
-                                        <p className="font-serif italic text-editorial-subtext">分析海量数据源中...</p>
-                                    </div>
+                                    <ResearchLoader logs={logs} />
                                 )}
                             </div>
                         </div>
                     )}
 
                     {state === AppState.COMPLETE && finalResult && (
-                        <div className="h-full overflow-y-auto w-full custom-scrollbar bg-white">
+                        <div className="h-full w-full bg-[#F5F3F0]">
                             <ReportDisplay 
                                 title={finalResult.title}
                                 report={finalResult.report} 

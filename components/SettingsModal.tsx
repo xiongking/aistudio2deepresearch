@@ -66,7 +66,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 }`}
               >
                 OpenAI 兼容
-                <span className="block text-xs font-serif italic mt-1 text-editorial-subtext">自定义 URL</span>
+                <span className="block text-xs font-serif italic mt-1 text-editorial-subtext">需配置搜索 API</span>
               </button>
             </div>
           </div>
@@ -74,16 +74,34 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
           <div className="space-y-6">
             <div className="space-y-2">
               <label className="block font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
-                API Key <span className="text-red-500">*</span>
+                LLM API Key <span className="text-red-500">*</span>
               </label>
               <input
                 type="password"
                 value={formData.apiKey}
                 onChange={e => setFormData({...formData, apiKey: e.target.value})}
-                placeholder="请输入您的 API Key"
+                placeholder="LLM API Key"
                 className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
                 required
               />
+            </div>
+
+            {/* Tavily API Key Section - Show for OpenAI or if user wants to override */}
+            <div className="space-y-2">
+               <label className="flex items-center justify-between font-mono text-xs font-bold text-editorial-subtext uppercase tracking-widest">
+                  <span>Tavily Search API Key</span>
+                  {!isGoogle && <span className="text-editorial-accent text-[10px]">推荐配置</span>}
+               </label>
+               <input
+                type="password"
+                value={formData.tavilyApiKey || ''}
+                onChange={e => setFormData({...formData, tavilyApiKey: e.target.value})}
+                placeholder={isGoogle ? "可选 (覆盖原生搜索)" : "强烈推荐用于联网搜索"}
+                className="w-full bg-editorial-highlight border border-editorial-border px-4 py-3 text-editorial-text focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
+              />
+              <p className="text-[10px] text-editorial-subtext font-sans">
+                {isGoogle ? "Google 模型通常自带搜索，但您可以配置 Tavily 以使用外部搜索。" : "OpenAI 模型无内置搜索。请提供 Tavily API Key 以启用联网研究能力。"}
+              </p>
             </div>
 
             <div className="space-y-2">

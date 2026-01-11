@@ -7,6 +7,7 @@ export interface ResearchConfig {
 export interface Settings {
   provider: 'google' | 'openai';
   apiKey: string;
+  tavilyApiKey?: string; // Added for external search
   baseUrl: string;
   model: string;
 }
@@ -16,7 +17,7 @@ export interface ResearchLog {
   timestamp: number;
   type: 'plan' | 'search' | 'analysis' | 'writing' | 'error' | 'info';
   message: string;
-  tokenCount?: number; // Added for token tracking
+  tokenCount?: number; 
   details?: any;
 }
 
@@ -26,8 +27,8 @@ export interface Source {
 }
 
 export interface ResearchResult {
-  id: string; // Unique ID for history
-  timestamp: number; // Created time
+  id: string; 
+  timestamp: number; 
   title: string;
   sections: string[]; 
   fullReport: string; 
@@ -37,7 +38,9 @@ export interface ResearchResult {
 
 export enum AppState {
   IDLE = 'IDLE',
-  RESEARCHING = 'RESEARCHING',
+  PLANNING = 'PLANNING', // Generating outline
+  OUTLINE_APPROVAL = 'OUTLINE_APPROVAL', // User editing outline
+  RESEARCHING = 'RESEARCHING', // Executing
   COMPLETE = 'COMPLETE',
   ERROR = 'ERROR'
 }
