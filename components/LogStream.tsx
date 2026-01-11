@@ -12,70 +12,76 @@ const LogStream: React.FC<LogStreamProps> = ({ logs }) => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [logs]);
 
+  // Translate log types
+  const getTypeLabel = (type: string) => {
+    switch(type) {
+      case 'plan': return '计划';
+      case 'search': return '搜索';
+      case 'analysis': return '分析';
+      case 'writing': return '撰写';
+      case 'error': return '错误';
+      case 'info': return '信息';
+      default: return '日志';
+    }
+  };
+
   return (
-    <div className="h-full flex flex-col bg-[#050505] border-r border-white/5 relative overflow-hidden">
+    <div className="h-full flex flex-col relative bg-editorial-bg">
       {/* Header */}
-      <div className="p-4 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-10 flex justify-between items-center">
-        <h3 className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-[0.2em]">
-          研究进程监控
+      <div className="p-8 border-b border-editorial-border sticky top-0 z-10 bg-editorial-bg/95 backdrop-blur-sm">
+        <h3 className="font-mono text-xs font-medium text-editorial-accent tracking-[0.2em] uppercase mb-2">
+          Research Log
         </h3>
-        <div className="flex gap-1">
-            <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse"></div>
-            <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse delay-75"></div>
-            <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse delay-150"></div>
-        </div>
+        <h2 className="font-serif text-xl text-editorial-text">研究进程</h2>
       </div>
       
       {/* Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-8 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-hide">
         {logs.length === 0 && (
-          <div className="h-full flex flex-col items-center justify-center opacity-20">
-             <div className="w-px h-16 bg-gradient-to-b from-transparent via-white to-transparent mb-4"></div>
-             <p className="text-[10px] font-mono tracking-widest uppercase">等待任务指令</p>
+          <div className="h-full flex flex-col items-center justify-center opacity-40">
+             <div className="w-px h-16 bg-editorial-border mb-4"></div>
+             <p className="font-serif italic text-editorial-subtext">等待指令...</p>
           </div>
         )}
         
         {logs.map((log, idx) => (
-          <div key={log.id} className="relative pl-6 group animate-in slide-in-from-left-2 fade-in duration-500">
-            {/* Connecting Line */}
-            <div className="absolute left-[3px] top-3 bottom-[-32px] w-px bg-white/5 group-last:hidden"></div>
+          <div key={log.id} className="relative pl-6 border-l border-editorial-border group animate-slide-up">
+            {/* Active Indicator */}
+            <div className={`absolute left-[-3px] top-2 w-[5px] h-[5px] rounded-full bg-editorial-bg border border-editorial-accent z-10 ${idx === logs.length - 1 ? 'bg-editorial-accent scale-125' : ''}`}></div>
             
-            {/* Status Indicator */}
-            <div className={`absolute left-0 top-1.5 w-[7px] h-[7px] rounded-sm rotate-45 border border-[#050505] shadow-[0_0_10px_rgba(0,0,0,0.5)] ${
-              log.type === 'error' ? 'bg-red-500' :
-              log.type === 'writing' ? 'bg-emerald-400' :
-              log.type === 'search' ? 'bg-blue-400' :
-              log.type === 'plan' ? 'bg-purple-400' :
-              'bg-gray-400'
-            }`}></div>
-            
-            <div className="flex flex-col gap-1">
-               <div className="flex items-center justify-between">
-                 <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                    log.type === 'error' ? 'text-red-400' :
-                    log.type === 'plan' ? 'text-purple-300' :
-                    log.type === 'search' ? 'text-blue-300' :
-                    log.type === 'writing' ? 'text-emerald-300' :
-                    'text-gray-500'
-                 }`}>
-                   {log.type}
-                 </span>
-                 <span className="text-[9px] text-gray-700 font-mono">
-                   {new Date(log.timestamp).toLocaleTimeString([], {hour12: false})}
+            <div className="flex flex-col gap-2">
+               <div className="flex items-baseline justify-between">
+                 <div className="flex items-center gap-3">
+                    <span className="font-mono text-[10px] text-editorial-subtext uppercase tracking-widest">
+                        {getTypeLabel(log.type)}
+                    </span>
+                    {log.tokenCount !== undefined && log.tokenCount > 0 && (
+                        <span className="font-mono text-[10px] text-editorial-accent/70 bg-editorial-accent/5 px-1.5 py-0.5 rounded">
+                            {log.tokenCount} Tokens
+                        </span>
+                    )}
+                 </div>
+                 <span className="font-mono text-[10px] text-gray-400">
+                   {new Date(log.timestamp).toLocaleTimeString([], {hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit'})}
                  </span>
                </div>
                
-               <p className="text-xs text-gray-300 leading-relaxed font-light">
+               <p className={`font-serif text-sm leading-relaxed ${log.type === 'error' ? 'text-red-700' : 'text-editorial-text'}`}>
                  {log.message}
                </p>
 
+               {/* Details / Sources List */}
                {log.details && Array.isArray(log.details) && (
-                 <div className="mt-2 pl-2 border-l border-white/5 space-y-1">
-                   {log.details.map((d: string, i: number) => (
-                     <p key={i} className="text-[10px] text-gray-500 font-mono truncate">
-                       {d}
-                     </p>
-                   ))}
+                 <div className="mt-3 pl-3 border-l-2 border-editorial-border/50 space-y-2">
+                   {log.details.map((d: string, i: number) => {
+                     // Check if details look like a link or source
+                     const isLink = d.startsWith('🔗');
+                     return (
+                        <p key={i} className={`text-xs font-sans ${isLink ? 'text-editorial-accent underline underline-offset-2' : 'text-editorial-subtext'} truncate`}>
+                            {d}
+                        </p>
+                     );
+                   })}
                  </div>
                )}
             </div>

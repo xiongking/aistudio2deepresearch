@@ -34,7 +34,6 @@ const App: React.FC = () => {
   const serviceRef = useRef<DeepResearchService>(new DeepResearchService());
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // Load History on Mount
   useEffect(() => {
     const storedHistory = localStorage.getItem('ds_history');
     if (storedHistory) {
@@ -46,9 +45,8 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Save History Helper
   const saveToHistory = (result: ResearchResult) => {
-    const newHistory = [result, ...history].slice(0, 50); // Keep last 50
+    const newHistory = [result, ...history].slice(0, 50);
     setHistory(newHistory);
     localStorage.setItem('ds_history', JSON.stringify(newHistory));
   };
@@ -62,11 +60,10 @@ const App: React.FC = () => {
   const loadFromHistory = (result: ResearchResult) => {
     setState(AppState.COMPLETE);
     setFinalResult(result);
-    setLogs(result.logs || []); // Restore logs if available
+    setLogs(result.logs || []);
     setReportTitle(result.title);
   };
 
-  // Auto-scroll preview
   useEffect(() => {
     if (previewRef.current) {
         previewRef.current.scrollTop = previewRef.current.scrollHeight;
@@ -109,7 +106,7 @@ const App: React.FC = () => {
              logs: currentLogs
           };
           setFinalResult(result);
-          saveToHistory(result); // Auto save
+          saveToHistory(result);
         }
       }
       
@@ -140,7 +137,8 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen bg-nebula text-gray-200 flex flex-col overflow-hidden font-sans selection:bg-blue-500/30">
+    <div className="h-screen flex flex-col overflow-hidden font-sans selection:bg-editorial-accent/20 selection:text-editorial-text relative">
+       
        <SettingsModal 
          isOpen={isSettingsOpen} 
          onClose={() => setIsSettingsOpen(false)}
@@ -156,45 +154,48 @@ const App: React.FC = () => {
          onDelete={deleteHistoryItem}
        />
 
-       {/* Top Navigation - Fixed Height */}
-       <header className="flex-none flex justify-between items-center px-6 py-4 border-b border-white/5 bg-[#030303]/80 backdrop-blur-md z-40">
-           <div className="flex items-center gap-3 cursor-pointer group" onClick={handleReset}>
-               <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-[0_0_20px_rgba(59,130,246,0.4)] group-hover:shadow-[0_0_30px_rgba(59,130,246,0.6)] transition-all transform group-hover:scale-105">
-                   <span className="font-serif font-bold text-white text-xl">D</span>
+       {/* Top Navigation - Classical Header */}
+       <header className="flex-none flex justify-between items-center px-8 py-5 z-40 bg-editorial-bg border-b border-editorial-border">
+           <div className="flex items-center gap-4 cursor-pointer group" onClick={handleReset}>
+               <div className="w-8 h-8 flex items-center justify-center border border-editorial-text rounded-sm transition-all group-hover:bg-editorial-text group-hover:text-white">
+                   <span className="font-serif font-bold text-lg">D</span>
                </div>
-               <span className="font-serif font-bold text-xl text-gray-200 tracking-wide hidden md:block group-hover:text-white transition-colors">
-                 深度<span className="text-blue-500">研究</span>
-               </span>
+               <div className="flex flex-col">
+                   <span className="font-serif font-bold text-lg text-editorial-text leading-none tracking-tight">
+                     深度研究
+                   </span>
+                   <span className="font-mono text-[10px] text-editorial-accent uppercase tracking-widest leading-none mt-1">
+                     DeepSeeker Agent
+                   </span>
+               </div>
            </div>
            
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-6">
               <button
                 onClick={() => setIsHistoryOpen(true)}
-                className="p-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                title="历史记录"
+                className="text-sm font-sans font-medium text-editorial-subtext hover:text-editorial-accent transition-colors flex items-center gap-2"
               >
-                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                 <span className="font-serif italic">档案</span>
               </button>
 
-              <div className="h-4 w-px bg-white/10"></div>
+              <div className="h-4 w-px bg-editorial-border"></div>
 
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono text-gray-400 hover:text-white hover:bg-white/5 rounded border border-transparent hover:border-white/10 transition-all"
+                className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-editorial-subtext hover:text-editorial-text transition-colors"
               >
-                <div className={`w-1.5 h-1.5 rounded-full ${settings.provider === 'google' ? 'bg-blue-500' : 'bg-purple-500'}`}></div>
-                <span className="uppercase">{settings.model || '未知模型'}</span>
-                <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                <span>{settings.model || 'GEMINI'}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${settings.provider === 'google' ? 'bg-editorial-accent' : 'bg-gray-400'}`}></span>
               </button>
            </div>
        </header>
 
-       {/* Main Layout - Flex 1 to fill remaining height */}
-       <div className="flex-1 flex overflow-hidden relative">
+       {/* Main Layout */}
+       <div className="flex-1 flex overflow-hidden relative z-10">
           
-          {/* IDLE VIEW Centered */}
+          {/* IDLE VIEW */}
           {state === AppState.IDLE && (
-            <div className="absolute inset-0 flex items-center justify-center z-10 p-4">
+            <div className="absolute inset-0 flex items-center justify-center p-6 bg-editorial-bg">
                 <ResearchForm 
                   onStart={handleStartResearch} 
                   state={state} 
@@ -204,54 +205,56 @@ const App: React.FC = () => {
             </div>
           )}
 
-          {/* SPLIT VIEW (Active) */}
+          {/* ACTIVE VIEW */}
           {state !== AppState.IDLE && (
-            <>
-                {/* Left: Log Stream (Sidebar) - Independent Scroll */}
-                <div className={`w-full lg:w-[400px] border-r border-white/5 bg-[#030303]/90 backdrop-blur flex-none flex flex-col h-full ${state === AppState.COMPLETE ? 'hidden lg:flex' : 'flex'}`}>
+            <div className="w-full h-full flex">
+                {/* Sidebar (Log Stream) - Fixed width, border right */}
+                <div className={`w-full lg:w-[380px] bg-editorial-bg border-r border-editorial-border flex flex-col transition-all duration-500 ${state === AppState.COMPLETE ? 'hidden lg:flex' : 'flex'}`}>
                     <LogStream logs={logs} />
                 </div>
 
-                {/* Right: Content Area - Independent Scroll */}
-                <div className={`flex-1 flex flex-col min-w-0 bg-[#020202] h-full ${state !== AppState.COMPLETE && 'hidden lg:flex'}`}>
+                {/* Content Area - Scrollable paper */}
+                <div className={`flex-1 bg-[#F5F3F0] overflow-hidden flex flex-col relative ${state !== AppState.COMPLETE && 'hidden lg:flex'}`}>
                     
                     {state === AppState.RESEARCHING && (
                         <div className="flex-1 flex flex-col h-full overflow-hidden">
-                            {/* Draft Header */}
-                            <div className="flex-none px-8 py-3 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
+                            <div className="flex-none px-12 py-4 bg-white border-b border-editorial-border flex justify-between items-center">
                                 <div className="flex items-center gap-3">
                                   <div className="relative flex h-2 w-2">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-editorial-accent opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-editorial-accent"></span>
                                   </div>
-                                  <span className="text-[10px] font-mono uppercase tracking-widest text-gray-500">实时撰写中</span>
+                                  <span className="font-mono text-xs font-medium uppercase tracking-widest text-editorial-subtext">正在撰写报告初稿...</span>
                                 </div>
                             </div>
 
-                            {/* Live Draft Scroll Area */}
-                            <div ref={previewRef} className="flex-1 overflow-y-auto p-8 md:p-12 lg:p-16 scroll-smooth">
+                            <div ref={previewRef} className="flex-1 overflow-y-auto p-8 md:p-16 scroll-smooth bg-white max-w-5xl mx-auto w-full shadow-editorial-lg my-8">
                                 {accumulatedReport ? (
-                                    <div className="prose prose-invert prose-lg max-w-4xl mx-auto pb-20">
+                                    <div className="prose prose-lg max-w-none font-serif text-editorial-text">
                                         <ReactMarkdown 
                                             remarkPlugins={[remarkGfm]}
                                             components={{
-                                                table: ({node, ...props}) => <table className="w-full text-left border-collapse border border-white/10 my-4" {...props} />,
-                                                th: ({node, ...props}) => <th className="p-3 border border-white/10 bg-white/5 font-semibold text-gray-200" {...props} />,
-                                                td: ({node, ...props}) => <td className="p-3 border border-white/10 text-gray-400" {...props} />,
-                                                sup: ({node, ...props}) => <sup className="text-blue-400 font-bold ml-0.5" {...props} />
+                                                h1: ({node, ...props}) => <h1 className="font-serif text-3xl font-bold border-b border-editorial-border pb-4 mb-6 mt-8" {...props} />,
+                                                h2: ({node, ...props}) => <h2 className="font-serif text-2xl font-bold text-editorial-text mt-8 mb-4 pl-0" {...props} />,
+                                                p: ({node, ...props}) => <p className="font-sans text-editorial-text leading-relaxed mb-4 text-justify" {...props} />,
+                                                table: ({node, ...props}) => <div className="overflow-x-auto my-8"><table className="w-full text-left border-collapse border-t-2 border-b-2 border-editorial-text" {...props} /></div>,
+                                                th: ({node, ...props}) => <th className="p-3 bg-editorial-bg font-sans font-bold text-xs uppercase tracking-wider border-b border-editorial-border" {...props} />,
+                                                td: ({node, ...props}) => <td className="p-3 border-b border-editorial-border font-sans text-sm" {...props} />,
+                                                sup: ({node, ...props}) => <sup className="text-editorial-accent font-bold ml-0.5 font-sans" {...props} />
                                             }}
                                         >
                                             {accumulatedReport.replace(/\[([0-9]+)\]/g, '<sup>[$1]</sup>')}
                                         </ReactMarkdown>
-                                        <div className="h-24 animate-pulse mt-8 bg-gradient-to-b from-transparent to-blue-500/5 rounded-b-lg border-b border-blue-500/20"></div>
+                                        <div className="h-24 mt-8 flex justify-center">
+                                            <div className="w-1.5 h-1.5 bg-editorial-accent rounded-full animate-bounce"></div>
+                                            <div className="w-1.5 h-1.5 bg-editorial-accent rounded-full animate-bounce delay-100 mx-1"></div>
+                                            <div className="w-1.5 h-1.5 bg-editorial-accent rounded-full animate-bounce delay-200"></div>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-gray-600 space-y-6">
-                                        <div className="relative w-16 h-16">
-                                            <div className="absolute inset-0 border-4 border-white/5 rounded-full"></div>
-                                            <div className="absolute inset-0 border-4 border-t-blue-500 rounded-full animate-spin"></div>
-                                        </div>
-                                        <p className="font-mono text-xs tracking-widest uppercase">初始化神经连接...</p>
+                                    <div className="h-full flex flex-col items-center justify-center space-y-6 opacity-50">
+                                        <div className="w-12 h-12 border-2 border-editorial-border rounded-full border-t-editorial-accent animate-spin"></div>
+                                        <p className="font-serif italic text-editorial-subtext">分析海量数据源中...</p>
                                     </div>
                                 )}
                             </div>
@@ -259,7 +262,7 @@ const App: React.FC = () => {
                     )}
 
                     {state === AppState.COMPLETE && finalResult && (
-                        <div className="h-full overflow-y-auto custom-scrollbar bg-white text-black w-full">
+                        <div className="h-full overflow-y-auto w-full custom-scrollbar bg-white">
                             <ReportDisplay 
                                 title={finalResult.title}
                                 report={finalResult.report} 
@@ -270,16 +273,15 @@ const App: React.FC = () => {
                     )}
                     
                     {state === AppState.ERROR && (
-                        <div className="flex-1 flex items-center justify-center p-6 h-full">
-                            <div className="bg-[#0a0a0c] border border-red-500/30 p-8 rounded-xl text-center max-w-md shadow-[0_0_50px_rgba(239,68,68,0.1)]">
-                                <div className="text-4xl mb-4">⚠️</div>
-                                <h2 className="text-red-400 text-lg font-bold font-mono uppercase mb-4 tracking-widest">协议中断</h2>
-                                <p className="text-gray-400 text-sm mb-8 leading-relaxed font-light">{logs[logs.length-1]?.message}</p>
+                        <div className="flex-1 flex items-center justify-center p-6 bg-editorial-bg">
+                            <div className="bg-white border border-red-200 p-12 rounded-lg text-center max-w-md shadow-editorial-lg">
+                                <div className="text-red-800 font-serif text-2xl mb-4 italic">流程中断</div>
+                                <p className="text-editorial-subtext font-sans text-sm mb-8 leading-relaxed">{logs[logs.length-1]?.message}</p>
                                 <div className="flex gap-4 justify-center">
-                                    <button onClick={() => setIsSettingsOpen(true)} className="px-6 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs font-mono uppercase tracking-wider transition-colors">
+                                    <button onClick={() => setIsSettingsOpen(true)} className="px-6 py-2 border border-editorial-border text-editorial-text font-sans text-sm hover:bg-editorial-bg transition-colors">
                                         检查配置
                                     </button>
-                                    <button onClick={handleReset} className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/50 rounded text-xs font-mono uppercase tracking-wider transition-all">
+                                    <button onClick={handleReset} className="px-6 py-2 bg-red-800 text-white font-sans text-sm hover:bg-red-700 transition-colors">
                                         重试
                                     </button>
                                 </div>
@@ -287,7 +289,7 @@ const App: React.FC = () => {
                         </div>
                     )}
                 </div>
-            </>
+            </div>
           )}
        </div>
     </div>

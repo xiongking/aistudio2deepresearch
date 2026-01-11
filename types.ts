@@ -16,6 +16,7 @@ export interface ResearchLog {
   timestamp: number;
   type: 'plan' | 'search' | 'analysis' | 'writing' | 'error' | 'info';
   message: string;
+  tokenCount?: number; // Added for token tracking
   details?: any;
 }
 

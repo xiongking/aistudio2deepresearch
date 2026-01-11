@@ -27,7 +27,6 @@ export class DeepResearchService {
         baseUrl: settings.baseUrl || undefined 
       });
     } else {
-      // For OpenAI, we don't need a client instance, we use fetch directly in the calls
       this.googleAI = null;
     }
   }
@@ -41,9 +40,9 @@ export class DeepResearchService {
   }
 
   /**
-   * Universal AI Caller
+   * Universal AI Caller with Token Tracking
    */
-  private async generateText(prompt: string, model: string, systemInstruction?: string, jsonMode?: boolean): Promise<string> {
+  private async generateText(prompt: string, model: string, systemInstruction?: string, jsonMode?: boolean): Promise<{ text: string, usage?: number }> {
     if (!this.settings) throw new Error("设置未初始化");
 
     // --- Google Provider ---
@@ -62,7 +61,11 @@ export class DeepResearchService {
         contents: prompt,
         config: config
       });
-      return response.text || "";
+      
+      // Extract usage metadata
+      const usage = response.usageMetadata?.totalTokenCount || 0;
+      
+      return { text: response.text || "", usage };
     } 
     
     // --- OpenAI Compatible Provider ---
@@ -101,53 +104,57 @@ export class DeepResearchService {
       }
 
       const data = await response.json();
-      return data.choices?.[0]?.message?.content || "";
+      return { 
+          text: data.choices?.[0]?.message?.content || "",
+          usage: data.usage?.total_tokens || 0
+      };
     }
   }
 
   /**
    * Generates Outline
    */
-  private async generateOutline(topic: string, depth: number, model: string): Promise<{ title: string; chapters: string[] }> {
+  private async generateOutline(topic: string, depth: number, model: string, currentDate: string): Promise<{ title: string; chapters: string[], usage: number }> {
     const chapterCount = depth === 1 ? 4 : depth === 2 ? 7 : 12;
     
-    const systemPrompt = "你是一位专业的学术研究导师。请以JSON格式输出。";
+    const systemPrompt = `你是一位专业的学术研究导师。当前时间是 ${currentDate}。请以JSON格式输出。`;
     const userPrompt = `
       主题: "${topic}"
       目标: 为一份博士级研究报告创建一个详细的目录（目标大约 ${chapterCount} 个主要章节）。
       
       要求:
       1. 标题必须具有学术性且描述性强，必须使用中文。
-      2. 章节必须涵盖历史背景、技术机制、市场分析、挑战、伦理考量和未来展望等。
-      3. 逻辑流畅，层层递进。
-      4. 输出必须完全使用简体中文。
+      2. 章节必须涵盖历史背景、技术机制、市场分析、挑战和未来展望等。
+      3. **严禁包含“伦理考量”、“道德风险”或类似的章节**。请专注于技术、科学、经济或历史层面的深度。
+      4. 逻辑流畅，层层递进。
+      5. 输出必须完全使用简体中文。
       
       返回 JSON: { "title": "报告标题", "chapters": ["1. 绪论", "2. 文献综述...", ...] }
     `;
 
     try {
-      const text = await this.generateText(userPrompt, model, systemPrompt, true);
-      // Clean up markdown block if present
+      const { text, usage } = await this.generateText(userPrompt, model, systemPrompt, true);
       const cleanText = text.replace(/```json\n|\n```/g, '');
       const json = JSON.parse(cleanText);
       
       if (!json.chapters || !Array.isArray(json.chapters)) {
           return { 
               title: json.title || topic, 
-              chapters: ["研究背景", "核心技术分析", "市场现状", "挑战与机遇", "结论与展望"] 
+              chapters: ["研究背景", "核心技术分析", "市场现状", "挑战与机遇", "结论与展望"],
+              usage: usage || 0
           };
       }
-      return json;
+      return { ...json, usage: usage || 0 };
     } catch (e) {
       console.error("Outline failed", e);
-      return { title: topic, chapters: ["研究背景", "核心分析", "结论"] };
+      return { title: topic, chapters: ["研究背景", "核心分析", "结论"], usage: 0 };
     }
   }
 
   /**
    * Generates Queries
    */
-  private async generateChapterQueries(topic: string, chapter: string, prevFindings: string[], model: string): Promise<string[]> {
+  private async generateChapterQueries(topic: string, chapter: string, prevFindings: string[], model: string): Promise<{ queries: string[], usage: number }> {
     const systemPrompt = "你是一个搜索专家。请返回JSON字符串数组。";
     const prompt = `
       主题: "${topic}"
@@ -161,17 +168,16 @@ export class DeepResearchService {
     `;
     
     try {
-      const text = await this.generateText(prompt, model, systemPrompt, true);
+      const { text, usage } = await this.generateText(prompt, model, systemPrompt, true);
       const cleanText = text.replace(/```json\n|\n```/g, '');
-      return JSON.parse(cleanText);
+      return { queries: JSON.parse(cleanText), usage: usage || 0 };
     } catch {
-      return [`${topic} ${chapter} 数据`, `${topic} 统计`];
+      return { queries: [`${topic} ${chapter} 数据`, `${topic} 统计`], usage: 0 };
     }
   }
 
   /**
    * Performs Search
-   * Note: OpenAI provider simulates search using LLM knowledge because it lacks a native search tool.
    */
   private async search(query: string, model: string): Promise<{ summary: string; sources: Source[] }> {
     if (!this.settings) throw new Error("设置未初始化");
@@ -196,22 +202,20 @@ export class DeepResearchService {
       }
     } 
     
-    // 2. OpenAI Provider (Simulated Search / Internal Knowledge)
+    // 2. OpenAI Provider (Simulated)
     else {
-      // In a real app, you would use Serper/Tavily API here. 
-      // For this simplified version, we ask the LLM to act as a knowledge base.
       const prompt = `
         你是一个拥有即时互联网知识的搜索引擎。
         请针对以下查询提供详细的、基于事实的摘要，包含数据、日期和关键实体。
         查询: "${query}"
         
-        如果可能，请在文末列出你所知道的该领域权威来源（虽然你不能浏览，但你可以列出通常发布此类数据的机构名称）。
+        文末请列出模拟的权威来源。
       `;
       try {
-         const text = await this.generateText(prompt, model, "You are a helpful research assistant.");
+         const { text } = await this.generateText(prompt, model, "You are a helpful research assistant.");
          return { 
              summary: text, 
-             sources: [{ title: "AI 内部知识库", uri: "#ai-generated" }] 
+             sources: [{ title: "AI 内部知识库 (OpenAI)", uri: "#ai-simulated" }] 
          };
       } catch (e) {
           return { summary: "", sources: [] };
@@ -227,10 +231,11 @@ export class DeepResearchService {
     chapterTitle: string, 
     findings: string[], 
     sources: Source[],
-    model: string
-  ): Promise<string> {
+    model: string,
+    currentDate: string
+  ): Promise<{ content: string, usage: number }> {
     const findingsText = findings.join('\n\n');
-    const systemPrompt = "你是一位严谨的博士后研究员。请用Markdown格式撰写。";
+    const systemPrompt = `你是一位严谨的博士后研究员。当前日期是 ${currentDate}。请用Markdown格式撰写。`;
     const prompt = `
       主题: "${topic}"
       当前章节: "${chapterTitle}"
@@ -247,12 +252,13 @@ export class DeepResearchService {
          格式: \`\`\`mermaid ... \`\`\`
       4. **表格**: 如果有统计数据，**必须**使用Markdown表格展示。
       5. **引用**: 在正文中必须使用 [x] 格式标注引用。**严禁**在章节末尾列出参考文献列表（它们将被统一汇总在报告末尾）。
-      6. **格式**: 使用 Markdown H2, H3, H4, 表格, 列表。
+      6. **时效性**: 确保文中提及的时间点（如“今年”、“最近”）是基于 ${currentDate} 的。
       
       只写这一章的内容。不要写 "好的，这是章节内容" 之类的废话，直接输出 Markdown。
     `;
 
-    return await this.generateText(prompt, model, systemPrompt);
+    const result = await this.generateText(prompt, model, systemPrompt);
+    return { content: result.text, usage: result.usage || 0 };
   }
 
   /**
@@ -260,30 +266,31 @@ export class DeepResearchService {
    */
   async *startResearch(config: ResearchConfig, settings: Settings): AsyncGenerator<ResearchLog> {
     this.cancelFlag = false;
-    this.initAI(settings); // Re-init with latest settings
+    this.initAI(settings); 
 
     const allSources: Source[] = [];
     const reportSections: string[] = [];
-    // Default fallback models if string is empty
     const model = settings.model || (settings.provider === 'google' ? 'gemini-3-pro-preview' : 'gpt-4o');
+    const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
     
     yield {
       id: crypto.randomUUID(),
       timestamp: Date.now(),
       type: 'plan',
       message: `深度研究协议启动`,
-      details: [`任务: ${config.query}`, `引擎: ${settings.provider.toUpperCase()} / ${model}`]
+      details: [`任务: ${config.query}`, `日期基准: ${currentDate}`, `引擎: ${settings.provider.toUpperCase()}`]
     };
 
     // 1. Outline
     yield { id: crypto.randomUUID(), timestamp: Date.now(), type: 'info', message: "正在构建研究框架..." };
-    const structure = await this.generateOutline(config.query, config.depth, model);
+    const structure = await this.generateOutline(config.query, config.depth, model, currentDate);
     
     yield { 
       id: crypto.randomUUID(), 
       timestamp: Date.now(), 
       type: 'plan', 
       message: `核心架构已生成: ${structure.title}`,
+      tokenCount: structure.usage,
       details: structure.chapters
     };
 
@@ -302,7 +309,7 @@ export class DeepResearchService {
       };
 
       // A. Generate Queries
-      const queries = await this.generateChapterQueries(config.query, chapter, chapterFindingsCache, model);
+      const { queries, usage: queryTokens } = await this.generateChapterQueries(config.query, chapter, chapterFindingsCache, model);
       
       // B. Search
       const chapterFindings: string[] = [];
@@ -310,20 +317,29 @@ export class DeepResearchService {
       
       for (const q of queries) {
         this.checkCancelled();
-        yield { id: crypto.randomUUID(), timestamp: Date.now(), type: 'search', message: `深度检索: ${q}` };
+        yield { 
+            id: crypto.randomUUID(), 
+            timestamp: Date.now(), 
+            type: 'search', 
+            message: `深度检索: ${q}`,
+            tokenCount: queryTokens // Attribute query gen tokens here roughly
+        };
         
-        await delay(300); 
+        await delay(500); // Rate limit buffer
         const res = await this.search(q, model);
         
         if (res.summary) chapterFindings.push(res.summary);
-        if (res.sources) chapterSources.push(...res.sources);
-        
-        yield { 
-          id: crypto.randomUUID(), 
-          timestamp: Date.now(), 
-          type: 'analysis', 
-          message: `数据源解析: 获得 ${res.sources.length} 条有效信息` 
-        };
+        if (res.sources && res.sources.length > 0) {
+            chapterSources.push(...res.sources);
+            // List sources in stream immediately
+            yield {
+                id: crypto.randomUUID(),
+                timestamp: Date.now(),
+                type: 'info',
+                message: `发现信息源 (${res.sources.length})`,
+                details: res.sources.map(s => `🔗 ${s.title} - ${s.uri}`)
+            };
+        }
       }
       
       allSources.push(...chapterSources);
@@ -332,7 +348,7 @@ export class DeepResearchService {
       // C. Write Chapter
       yield { id: crypto.randomUUID(), timestamp: Date.now(), type: 'writing', message: `正在撰写: ${chapter}` };
       
-      const chapterContent = await this.writeChapter(config.query, chapter, chapterFindings, chapterSources, model);
+      const { content: chapterContent, usage: writeTokens } = await this.writeChapter(config.query, chapter, chapterFindings, chapterSources, model, currentDate);
       reportSections.push(chapterContent);
 
       yield {
@@ -340,13 +356,13 @@ export class DeepResearchService {
         timestamp: Date.now(),
         type: 'info',
         message: `章节 ${i+1} 完成`,
+        tokenCount: writeTokens,
         details: { partialSection: chapterContent } 
       };
     }
 
     // 3. Final Compilation
     const uniqueSources = Array.from(new Map(allSources.map(s => [s.uri, s])).values());
-    // Only place references at the VERY END
     const fullReport = `# ${structure.title}\n\n` + reportSections.join('\n\n') + `\n\n## 参考文献与引用\n` + uniqueSources.map((s,i) => `[${i+1}] ${s.title}: ${s.uri}`).join('\n');
 
     yield {

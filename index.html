@@ -4,197 +4,215 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>深度研究 // Deep Research</title>
+    <!-- Fonts: Playfair Display (Headings), Source Sans 3 (Body), IBM Plex Mono (UI/Labels) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;500;600&family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-docx-js-typescript@0.1.5/dist/index.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600&family=JetBrains+Mono:wght@300;400;500&family=Cinzel:wght@400;600&family=Noto+Serif+SC:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              serif: ['Playfair Display', 'Noto Serif SC', 'serif'],
+              sans: ['Source Sans 3', 'sans-serif'],
+              mono: ['IBM Plex Mono', 'monospace'],
+            },
+            colors: {
+              editorial: {
+                bg: '#FAFAF8',        /* Ivory */
+                text: '#1A1A1A',      /* Rich Black */
+                subtext: '#6B6B6B',   /* Warm Gray */
+                accent: '#B8860B',    /* Burnished Gold */
+                accentLight: '#D4A84B',
+                border: '#E8E4DF',    /* Warm Gray Border */
+                card: '#FFFFFF',      /* Pure White */
+                highlight: '#F5F3F0', /* Muted Surface */
+              }
+            },
+            backgroundImage: {
+              'paper-pattern': "url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjRkFGQUY4Ii8+CjxyZWN0IHdpZHRoPSIxIiBoZWlnaHQ9IjEiIGZpbGw9IiMwMDAiIG9wYWNpdHk9IjAuMDIiLz4KPC9zdmc+')",
+            },
+            boxShadow: {
+              'editorial-sm': '0 1px 2px rgba(26,26,26,0.04)',
+              'editorial-md': '0 4px 12px rgba(26,26,26,0.06)',
+              'editorial-lg': '0 8px 24px rgba(26,26,26,0.08)',
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.6s ease-out forwards',
+              'slide-up': 'slideUp 0.5s ease-out forwards',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { transform: 'translateY(15px)', opacity: '0' },
+                '100%': { transform: 'translateY(0)', opacity: '1' },
+              }
+            }
+          }
+        }
+      }
+    </script>
+
     <style>
       :root {
-        --bg-color: #050505;
-        --text-primary: #e5e5e5;
-        --border-color: rgba(255, 255, 255, 0.08);
+        --bg-color: #FAFAF8;
+        --text-primary: #1A1A1A;
+        --accent: #B8860B;
       }
+      
       body {
-        font-family: 'Inter', 'Noto Serif SC', sans-serif;
         background-color: var(--bg-color);
         color: var(--text-primary);
+        font-family: 'Source Sans 3', sans-serif;
         overflow-x: hidden;
-      }
-      .font-mono { font-family: 'JetBrains Mono', monospace; }
-      .font-serif { font-family: 'Cinzel', 'Noto Serif SC', serif; }
-      
-      /* Deep Space Background */
-      .bg-nebula {
-        background-color: #020202;
-        background-image: 
-          radial-gradient(circle at 50% 0%, rgba(30, 41, 59, 0.3) 0%, transparent 45%),
-          radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.08) 0%, transparent 25%),
-          radial-gradient(circle at 15% 85%, rgba(139, 92, 246, 0.08) 0%, transparent 25%);
-        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
       }
 
-      /* Scrollbar */
+      /* Noise Texture Overlay */
+      .paper-texture {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJnoiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjY1IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjAzIi8+PC9zdmc+');
+        pointer-events: none;
+        z-index: 50;
+      }
+
+      /* Scrollbar - Refined & Thin */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-      ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+      ::-webkit-scrollbar-thumb { background: #D1CEC9; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #B8860B; }
       
       .scrollbar-hide::-webkit-scrollbar { display: none; }
       .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-      /* =========================================
-         Mdtht-inspired Document Theme 
-         (Clean, Academic, Readable)
-         ========================================= */
+      /* Document Theme - Classical Editorial */
       .document-theme {
         font-family: 'Noto Serif SC', serif;
-        color: #e5e5e5;
-        line-height: 1.8;
+        color: #1A1A1A;
+        line-height: 1.85;
+        font-size: 1.05rem;
       }
       
       .document-theme h1, 
       .document-theme h2, 
       .document-theme h3, 
       .document-theme h4 {
-        font-family: 'Noto Serif SC', serif;
-        font-weight: 700;
-        margin-top: 2em;
+        font-family: 'Playfair Display', 'Noto Serif SC', serif;
+        color: #1A1A1A;
+        margin-top: 2.5em;
         margin-bottom: 0.8em;
-        color: #fff;
+        font-weight: 600;
         letter-spacing: -0.01em;
       }
       
-      .document-theme h1 { font-size: 2.5em; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 0.5em; }
-      .document-theme h2 { font-size: 1.8em; position: relative; padding-left: 0.8em; border-left: 4px solid #3b82f6; }
-      .document-theme h3 { font-size: 1.4em; color: #cbd5e1; }
+      .document-theme h1 { 
+        font-size: 2.8rem; 
+        line-height: 1.2;
+        border-bottom: 1px solid #E8E4DF;
+        padding-bottom: 0.8rem;
+      }
+      .document-theme h2 { 
+        font-size: 2rem; 
+        position: relative;
+        padding-left: 0;
+      }
+      .document-theme h3 { 
+        font-size: 1.4rem; 
+        font-style: italic;
+        color: #444;
+      }
       
-      .document-theme p { margin-bottom: 1.5em; text-align: justify; font-size: 1.05rem; color: #d4d4d8; }
+      .document-theme p { margin-bottom: 1.5em; text-align: justify; }
       
       .document-theme blockquote {
-        border-left: 4px solid #64748b;
-        background: rgba(255,255,255,0.03);
-        padding: 1em 1.5em;
-        margin: 1.5em 0;
+        border-left: 2px solid #B8860B;
+        background: transparent;
+        padding: 0.5em 0 0.5em 1.5em;
+        margin: 2em 0;
+        font-family: 'Playfair Display', serif;
         font-style: italic;
-        color: #94a3b8;
-        border-radius: 0 8px 8px 0;
+        font-size: 1.25rem;
+        color: #555;
       }
-      
-      .document-theme ul, 
-      .document-theme ol {
-        margin-bottom: 1.5em;
-        padding-left: 1.5em;
-      }
-      
-      .document-theme li { margin-bottom: 0.5em; color: #d4d4d8; }
-      .document-theme li::marker { color: #60a5fa; }
-
-      .document-theme strong { color: #fff; font-weight: 600; }
       
       .document-theme a {
-        color: #60a5fa;
+        color: #B8860B;
         text-decoration: none;
-        border-bottom: 1px dashed rgba(96, 165, 250, 0.4);
-        transition: all 0.2s;
+        border-bottom: 1px solid rgba(184, 134, 11, 0.3);
+        transition: border-color 0.2s;
       }
-      .document-theme a:hover { border-bottom-style: solid; color: #93c5fd; }
+      .document-theme a:hover { border-bottom-color: #B8860B; }
 
-      /* Superscript Styling */
-      sup {
-        color: #60a5fa;
-        font-weight: bold;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.75em;
-        margin-left: 2px;
-        vertical-align: super;
-      }
-
-      /* Table Styling */
       .document-theme table {
         width: 100%;
         border-collapse: collapse;
-        margin: 2.5rem 0;
-        font-size: 0.9em;
-        font-family: 'Inter', sans-serif; /* Tables read better in sans-serif */
-        border-radius: 8px;
-        overflow: hidden;
-        border: 1px solid rgba(255,255,255,0.1);
+        margin: 3rem 0;
+        font-family: 'Source Sans 3', sans-serif;
+        font-size: 0.95rem;
+        border-top: 2px solid #1A1A1A;
+        border-bottom: 2px solid #1A1A1A;
       }
       .document-theme th {
-        background-color: rgba(255,255,255,0.08);
-        border-bottom: 2px solid rgba(255,255,255,0.1);
-        padding: 1rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-size: 0.85rem;
+        padding: 1rem 0.5rem;
         text-align: left;
         font-weight: 600;
-        color: #fff;
+        border-bottom: 1px solid #E8E4DF;
       }
       .document-theme td {
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        padding: 1rem;
-        color: #d4d4d8;
+        padding: 1rem 0.5rem;
+        border-bottom: 1px solid #E8E4DF;
+        color: #444;
       }
-      .document-theme tr:hover td { background-color: rgba(255,255,255,0.02); }
-      
-      /* Code Blocks */
+      .document-theme tr:last-child td { border-bottom: none; }
+
       .document-theme code {
-        background: rgba(255,255,255,0.1);
+        background: #F5F3F0;
         padding: 0.2em 0.4em;
-        border-radius: 4px;
-        font-family: 'JetBrains Mono', monospace;
+        font-family: 'IBM Plex Mono', monospace;
         font-size: 0.85em;
-        color: #e2e8f0;
-      }
-      .document-theme pre code {
-        display: block;
-        padding: 1em;
-        overflow-x: auto;
-        background: #0f0f10;
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 8px;
-        line-height: 1.5;
+        color: #B8860B;
+        border-radius: 2px;
       }
 
-      /* Export Mode overrides for White Paper look */
-      #report-content.export-mode {
-        background: white !important;
-        color: black !important;
-        padding: 0 !important;
-        border: none !important;
-        box-shadow: none !important;
+      sup { color: #B8860B; font-weight: 600; font-family: 'Source Sans 3', sans-serif; }
+      
+      /* Small Caps Helper */
+      .sc {
+        font-variant: small-caps;
+        letter-spacing: 0.05em;
       }
-      #report-content.export-mode .document-theme { color: black !important; font-family: 'Times New Roman', serif !important; }
-      #report-content.export-mode h1, 
-      #report-content.export-mode h2, 
-      #report-content.export-mode h3 { color: #000 !important; border-color: #000 !important; }
-      #report-content.export-mode p, 
-      #report-content.export-mode li,
-      #report-content.export-mode td { color: #000 !important; }
-      #report-content.export-mode table, 
-      #report-content.export-mode th, 
-      #report-content.export-mode td { border-color: #000 !important; }
-      #report-content.export-mode th { background-color: #f3f4f6 !important; }
-      #report-content.export-mode a { color: #0000EE !important; }
-      #report-content.export-mode sup { color: #000 !important; }
     </style>
-    <script type="importmap">
-    {
-      "imports": {
-        "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
-        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-        "react/": "https://esm.sh/react@^19.2.3/",
-        "react": "https://esm.sh/react@^19.2.3",
-        "react-markdown": "https://esm.sh/react-markdown@^9.0.1",
-        "remark-gfm": "https://esm.sh/remark-gfm@^4.0.0",
-        "rehype-raw": "https://esm.sh/rehype-raw@^7.0.0",
-        "mermaid": "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"
-      }
-    }
-    </script>
-  </head>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
+    "react-markdown": "https://esm.sh/react-markdown@^10.1.0",
+    "mermaid": "https://esm.sh/mermaid@^11.12.2",
+    "rehype-raw": "https://esm.sh/rehype-raw@^7.0.0",
+    "remark-gfm": "https://esm.sh/remark-gfm@^4.0.1"
+  }
+}
+</script>
+</head>
   <body>
-    <div id="root"></div>
+    <div class="paper-texture"></div>
+    <div id="root" class="relative z-10"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>
