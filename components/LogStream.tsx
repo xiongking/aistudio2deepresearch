@@ -279,24 +279,24 @@ const LogStream: React.FC<LogStreamProps> = ({ logs, totalSteps = 0, currentStep
                         研究任务已完成
                     </h3>
                     <div className="w-full h-px bg-editorial-border/60 my-2"></div>
-                    <div className="space-y-1.5 mb-4">
-                        <div className="flex justify-between text-[10px] font-mono text-editorial-text">
+                    <div className="space-y-2 mb-4">
+                        <div className="flex justify-between items-center text-[11px] font-mono font-bold text-editorial-text">
                             <span className="text-editorial-subtext">搜索调用</span>
                             <span>{finalStats.searchCount} 次</span>
                         </div>
-                        <div className="flex justify-between text-[10px] font-mono text-editorial-text">
+                        <div className="flex justify-between items-center text-[11px] font-mono font-bold text-editorial-text">
                             <span className="text-editorial-subtext">消耗 Tokens</span>
                             <span>{finalStats.tokens.toLocaleString()}</span>
                         </div>
                         {finalStats.duration && (
-                            <div className="flex justify-between text-[10px] font-mono text-editorial-text font-bold">
-                                <span className="text-editorial-subtext font-normal">研究总耗时</span>
+                            <div className="flex justify-between items-center text-[11px] font-mono font-bold text-editorial-text">
+                                <span className="text-editorial-subtext">研究总耗时</span>
                                 <span>{formatDuration(finalStats.duration)}</span>
                             </div>
                         )}
                         {finalStats.wordCount !== undefined && (
-                          <div className="flex justify-between text-[10px] font-mono text-editorial-text font-bold pt-1 border-t border-editorial-border/50 mt-1">
-                              <span className="text-editorial-subtext font-normal">报告总字数</span>
+                          <div className="flex justify-between items-center text-[11px] font-mono font-bold text-editorial-text pt-2 border-t border-editorial-border/50 mt-2">
+                              <span className="text-editorial-subtext">报告总字数</span>
                               <span>{finalStats.wordCount.toLocaleString()} 字</span>
                           </div>
                         )}
