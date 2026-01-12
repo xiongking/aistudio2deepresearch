@@ -76,9 +76,9 @@ const ResearchForm: React.FC<ResearchFormProps> = ({ onStart, state, onOpenSetti
                 {/* Depth Selector inside Input */}
                 <div className="flex bg-editorial-bg rounded-lg p-1 gap-1 border border-editorial-border">
                 {[
-                    { lvl: 1, label: "简报" },
+                    { lvl: 1, label: "简要" },
                     { lvl: 2, label: "标准" },
-                    { lvl: 3, label: "深度" }
+                    { lvl: 3, label: "详实" }
                 ].map((opt) => (
                     <button
                     key={opt.lvl}

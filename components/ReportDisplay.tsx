@@ -174,13 +174,46 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
           {/* Content */}
           <article className="document-theme">
             <style>{`
+              /* Only indent direct body paragraphs */
               .document-theme p {
                 text-indent: 2em;
                 text-align: justify;
+                margin-bottom: 1.5em;
               }
-              .document-theme h1, .document-theme h2, .document-theme h3, .document-theme li, .document-theme td, .document-theme th, .document-theme blockquote p {
-                text-indent: 0;
+              
+              /* Explicitly reset indent for elements that might inherit or misbehave */
+              .document-theme h1, 
+              .document-theme h2, 
+              .document-theme h3, 
+              .document-theme h4, 
+              .document-theme h5, 
+              .document-theme h6, 
+              .document-theme li, 
+              .document-theme ul, 
+              .document-theme ol, 
+              .document-theme table, 
+              .document-theme thead, 
+              .document-theme tbody, 
+              .document-theme tr, 
+              .document-theme th, 
+              .document-theme td, 
+              .document-theme blockquote,
+              .document-theme blockquote p,
+              .document-theme .mermaid,
+              .document-theme sup,
+              .citation-badge {
+                text-indent: 0 !important;
               }
+
+              /* Lists indentation handling */
+              .document-theme ul, .document-theme ol {
+                padding-left: 2em;
+              }
+              .document-theme li {
+                padding-left: 0.2em;
+                margin-bottom: 0.5em;
+              }
+
               /* Strict Mermaid Reset */
               .document-theme .mermaid, .document-theme .mermaid svg {
                 text-indent: 0 !important;
@@ -210,6 +243,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 transform: translateY(-2px);
                 transition: all 0.2s ease;
                 box-shadow: 0 1px 2px rgba(184, 134, 11, 0.3);
+                text-indent: 0 !important; /* Ensure no indent inside badge */
               }
               .citation-badge:hover {
                 background-color: #1A1A1A; /* Dark on hover */
@@ -227,9 +261,9 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 // Removed custom strong component to allow standard browser/tailwind font-weight handling for robustness
                 strong: ({node, ...props}) => <strong className="font-bold text-editorial-text !important" {...props} />,
                 table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed !indent-0" {...props} />,
-                thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent" {...props} />,
-                tbody: ({node, ...props}) => <tbody {...props} />,
-                tr: ({node, ...props}) => <tr className="even:bg-[#FAFAF8] hover:bg-editorial-highlight/80 border-b border-editorial-border/30 last:border-0 transition-colors" {...props} />,
+                thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent !indent-0" {...props} />,
+                tbody: ({node, ...props}) => <tbody className="!indent-0" {...props} />,
+                tr: ({node, ...props}) => <tr className="even:bg-[#FAFAF8] hover:bg-editorial-highlight/80 border-b border-editorial-border/30 last:border-0 transition-colors !indent-0" {...props} />,
                 th: ({node, ...props}) => <th className="p-3 font-serif font-bold text-sm uppercase tracking-wider text-editorial-text !indent-0" {...props} />,
                 td: ({node, ...props}) => <td className="p-3 font-sans text-sm text-editorial-text align-top !indent-0" {...props} />,
                 code({node, className, children, ...props}) {
