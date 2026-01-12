@@ -72,10 +72,11 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
 
   // Parse Headers for TOC (H1 -> H2 -> H3)
   useEffect(() => {
-    // 1. Process Citations: [1] -> <sup><a href="#ref-1">[1]</a></sup>
+    // 1. Process Citations: [1] -> <a href="#ref-1" class="citation-badge">1</a>
+    // We remove the brackets in the visual display, using a circle badge instead.
     const reportWithCitations = report.replace(
         /\[(\d+)\]/g, 
-        '<sup class="citation-ref"><a href="#ref-$1" data-id="$1">[$1]</a></sup>'
+        '<a href="#ref-$1" class="citation-badge" title="查看来源">$1</a>'
     );
 
     const lines = reportWithCitations.split('\n');
@@ -186,23 +187,34 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 margin-left: 0 !important;
                 white-space: normal !important;
               }
-              /* Citation Styles */
-              .citation-ref {
-                font-size: 0.75em;
+              
+              /* Prominent Citation Badge Style */
+              .citation-badge {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                height: 1.25em;
+                min-width: 1.25em;
+                padding: 0 0.25em;
+                background-color: #B8860B; /* Editorial Accent */
+                color: white !important; /* Force white text */
+                border-radius: 9999px; /* Rounded pill/circle */
+                font-family: 'IBM Plex Mono', monospace;
+                font-size: 0.65em;
+                font-weight: 600;
+                text-decoration: none !important;
+                border-bottom: none !important;
                 vertical-align: super;
-                margin-left: 0.1em;
-                user-select: none;
+                margin: 0 2px;
+                line-height: 1;
+                transform: translateY(-2px);
+                transition: all 0.2s ease;
+                box-shadow: 0 1px 2px rgba(184, 134, 11, 0.3);
               }
-              .citation-ref a {
-                color: #B8860B;
-                text-decoration: none;
-                border-bottom: none;
-                font-weight: bold;
-                transition: opacity 0.2s;
-              }
-              .citation-ref a:hover {
-                opacity: 0.7;
-                text-decoration: none;
+              .citation-badge:hover {
+                background-color: #1A1A1A; /* Dark on hover */
+                transform: translateY(-4px) scale(1.1);
+                box-shadow: 0 3px 6px rgba(0,0,0,0.2);
               }
             `}</style>
             <ReactMarkdown
@@ -249,10 +261,13 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
               </h1>
               <div className="grid grid-cols-1 gap-1.5 !indent-0">
                 {sources.map((s, i) => (
-                  <div key={i} id={`ref-${i+1}`} className="flex items-start gap-2 text-sm !indent-0 scroll-mt-32">
-                    <span className="font-mono text-editorial-accent font-bold text-[10px] pt-1 w-6 text-right flex-none">[{i+1}]</span>
+                  <div key={i} id={`ref-${i+1}`} className="flex items-start gap-2 text-sm !indent-0 scroll-mt-32 hover:bg-editorial-highlight/50 p-1 rounded transition-colors">
+                    {/* Matching Reference Badge */}
+                    <span className="flex-none flex items-center justify-center w-5 h-5 bg-editorial-accent text-white rounded-full text-[10px] font-mono font-bold mt-0.5">
+                      {i+1}
+                    </span>
                     
-                    <a href={s.uri} target="_blank" rel="noreferrer" className="group flex items-center gap-2 hover:bg-editorial-highlight px-2 rounded -ml-2 transition-colors max-w-full">
+                    <a href={s.uri} target="_blank" rel="noreferrer" className="group flex items-center gap-2 px-1 rounded transition-colors max-w-full overflow-hidden">
                         <img 
                           src={getFaviconUrl(s.uri)} 
                           alt="•" 

@@ -283,7 +283,7 @@ export class DeepResearchService {
       
       // B. Search
       const chapterFindings: string[] = [];
-      const chapterLocalSources: Source[] = [];
+      const chapterPromptSources = new Set<string>();
       
       for (const q of queries) {
         this.checkCancelled();
@@ -297,10 +297,23 @@ export class DeepResearchService {
         
         await delay(500); 
         const res = await this.search(q, model);
-        
-        if (res.summary) chapterFindings.push(res.summary);
+        const currentQueryIndices: number[] = [];
+
+        // Register sources immediately to bind them to the finding
         if (res.sources && res.sources.length > 0) {
-            chapterLocalSources.push(...res.sources);
+            for (const src of res.sources) {
+                let index: number;
+                if (uniqueSourceMap.has(src.uri)) {
+                    index = uniqueSourceMap.get(src.uri)!;
+                } else {
+                    globalSources.push(src);
+                    index = globalSources.length; // 1-based index
+                    uniqueSourceMap.set(src.uri, index);
+                }
+                currentQueryIndices.push(index);
+                chapterPromptSources.add(`[${index}] ${src.title}`);
+            }
+
             yield {
                 id: crypto.randomUUID(),
                 timestamp: Date.now(),
@@ -309,24 +322,17 @@ export class DeepResearchService {
                 details: res.sources.map(s => `🔗 ${s.title} - ${s.uri}`)
             };
         }
+        
+        if (res.summary) {
+            // Bind the specific source IDs to this summary block
+            // This prevents LLM from citing generic "[研究材料]"
+            const sourceTags = currentQueryIndices.length > 0 
+                ? ` (来源ID: ${currentQueryIndices.map(i => `[${i}]`).join(', ')})` 
+                : '';
+            chapterFindings.push(`资料: "${res.summary}"${sourceTags}`);
+        }
       }
 
-      // C. Update Global Sources Index for this chapter
-      const chapterPromptSources: string[] = [];
-      
-      for (const src of chapterLocalSources) {
-          let index: number;
-          if (uniqueSourceMap.has(src.uri)) {
-              index = uniqueSourceMap.get(src.uri)!;
-          } else {
-              globalSources.push(src);
-              index = globalSources.length; // 1-based index
-              uniqueSourceMap.set(src.uri, index);
-          }
-          // Format for Prompt: [index] Title
-          chapterPromptSources.push(`[${index}] ${src.title}`);
-      }
-      
       chapterFindingsCache.push(chapterFindings.join('\n').slice(0, 1000)); 
 
       // D. Write Chapter
@@ -336,7 +342,7 @@ export class DeepResearchService {
           config.query, 
           chapter, 
           chapterFindings, 
-          chapterPromptSources, // Pass formatted source list with Global IDs
+          Array.from(chapterPromptSources), // Pass formatted source list with Global IDs
           model
       );
       totalTokens += writeTokens;
@@ -408,15 +414,14 @@ export class DeepResearchService {
     const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
     
     const findingsText = findings.join('\n\n');
-    // Deduplicate prompt sources roughly for the prompt context
-    const uniquePromptSources = Array.from(new Set(promptSources)).join('\n');
+    const uniquePromptSources = promptSources.join('\n');
 
     const systemPrompt = `你是一位严谨的深度研究员。当前日期是 ${currentDate}。请用Markdown格式撰写。`;
     const prompt = `
       主题: "${topic}"
       当前章节: "${chapterTitle}"
       
-      研究材料 (Findings):
+      研究材料 (Findings) - 包含具体的来源ID:
       ${findingsText}
       
       可用参考文献 (Sources):
@@ -429,14 +434,15 @@ export class DeepResearchService {
       2. **学术语调**: 正式、客观、深度。简体中文。
       3. **篇幅**: 详尽（约 800-1500 字）。
       4. **引用规范 (关键)**: 
+         - 研究材料中已标记了来源ID (如 "来源ID: [1], [2]")。
          - **必须**在文中引用事实、数据或观点时，在句尾使用上标数字 **[x]** 标注来源。
-         - **严禁**使用未在 "可用参考文献" 中列出的编号。
+         - **严禁**使用 "[研究材料]"、"[资料]"、"[Source]" 或其他非数字引用。
+         - **严禁**编造未出现在 "可用参考文献" 中的编号。
          - 例如: "根据最新报告显示，增长率为5% [1]。"
-      5. **粗体与引号规范 (Bug修复)**:
-         - **严禁**使用 **"文本"** 或 **“文本”** 的格式（这会导致渲染错误）。
+      5. **粗体与引号规范**:
+         - **严禁**使用 **"文本"** 或 **“文本”** 的格式。
          - **必须**将引号放在粗体标记之外。
          - 正确示例: "**核心概念**" 或 "根据 **报告** 指出"。
-         - 错误示例: **"核心概念"** (错误)。
       6. **可视化**: 必须包含一个 Mermaid.js 图表。
          - **Mermaid 规范**: 仅使用英文ID (NodeA)，严禁在图表代码中提及 "mermaid" 字眼，仅用 "下图展示..." 引出。
          - 节点文本用英文双引号。
