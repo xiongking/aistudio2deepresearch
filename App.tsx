@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { Telescope, History, SquarePen, Settings as SettingsIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import ResearchForm from './components/ResearchForm';
 import LogStream from './components/LogStream';
 import ReportDisplay from './components/ReportDisplay';
@@ -52,6 +53,7 @@ const App: React.FC = () => {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [history, setHistory] = useState<ResearchResult[]>([]);
+  const [startTime, setStartTime] = useState<number | undefined>(undefined);
   
   // Logic for Time Estimation
   const [totalChapters, setTotalChapters] = useState(0);
@@ -73,8 +75,8 @@ const App: React.FC = () => {
     return {
       provider: 'openai',
       apiKey: '',
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o'
+      baseUrl: 'https://api.deepseek.com',
+      model: 'deepseek-chat'
     };
   });
 
@@ -130,6 +132,7 @@ const App: React.FC = () => {
     setLogs(result.logs || []);
     setReportTitle(result.title);
     setCurrentConfig({ query: result.title, depth: 3, breadth: 3 }); 
+    setStartTime(result.timestamp); // Use historical timestamp for display
   };
 
   useEffect(() => {
@@ -155,6 +158,7 @@ const App: React.FC = () => {
     setAccumulatedReport('');
     setFinalResult(null);
     setCompletedChapters(0);
+    setStartTime(Date.now()); // Initialize start time
 
     try {
       const { title, chapters, usage } = await serviceRef.current.generateResearchPlan(config, settings);
@@ -190,6 +194,8 @@ const App: React.FC = () => {
     setState(AppState.RESEARCHING);
     setReportTitle(title);
     setTotalChapters(chapters.length);
+    // Reset Start Time for accurate "Research Duration" if user spent time editing outline
+    // Or keep it from planning. Let's keep from planning to count total effort.
     
     try {
       const generator = serviceRef.current.executeResearch(currentConfig, settings, title, chapters);
@@ -209,10 +215,13 @@ const App: React.FC = () => {
         }
 
         if (log.type === 'info' && log.details?.completedResult) {
+          const endTime = Date.now();
           const result = {
              ...log.details.completedResult,
              id: crypto.randomUUID(),
-             timestamp: Date.now(),
+             timestamp: endTime, // Use end time for record? or start? Record uses timestamp for ID usually.
+             startTime: startTime,
+             endTime: endTime,
              logs: currentLogs
           };
           setFinalResult(result);
@@ -256,6 +265,7 @@ const App: React.FC = () => {
     setFinalResult(null);
     setPendingOutline(null);
     setCurrentConfig(null);
+    setStartTime(undefined);
   };
 
   // Determine if we show the sidebars based on state
@@ -282,55 +292,58 @@ const App: React.FC = () => {
        {/* Top Navigation */}
        <header className="flex-none flex justify-between items-center px-8 py-4 z-40 bg-editorial-bg border-b border-editorial-border">
            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-4 cursor-pointer group" onClick={handleReset}>
-                  {/* Brain Logo */}
-                  <div className="w-10 h-10 flex items-center justify-center text-editorial-text transition-transform group-hover:scale-110">
-                      <svg className="w-full h-full" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" fillOpacity="0" />
-                        <path d="M18.3 8.3C17.9 6.4 16.4 4.8 14.5 4.3C14.1 4.2 13.6 4.6 13.7 5C13.8 5.4 14.3 5.6 14.7 5.5C16.1 5.8 17.2 7 17.5 8.5C17.6 8.9 18 9.1 18.4 9C18.8 8.9 19 8.5 18.9 8.1L18.3 8.3ZM12 2C13.6 2 15.1 2.4 16.5 3.2L16.2 4.1C14.9 3.4 13.5 3 12 3C8.6 3 5.6 4.9 4.1 7.7L3.2 7.2C5 3.9 8.3 2 12 2ZM6.5 17.5C5.1 16.1 4.2 14.2 4.2 12.1L3.2 12.1C3.2 14.5 4.3 16.7 5.9 18.2L6.5 17.5ZM12 22C14.6 22 17 21 18.7 19.3L18 18.6C16.5 20.1 14.3 21 12 21C9 21 6.3 19.5 4.8 17.1L4 17.6C5.7 20.3 8.7 22 12 22ZM20.8 12.1C20.8 13.8 20.2 15.4 19.3 16.8L20.1 17.4C21.2 15.8 21.8 13.9 21.8 12.1H20.8ZM16.5 6.5C15.8 5.8 14.9 5.3 13.9 5.1C13.5 5 13.2 5.3 13.3 5.7C13.4 6.1 13.8 6.3 14.2 6.4C14.9 6.5 15.6 6.9 16.1 7.4C16.4 7.7 16.8 7.7 17.1 7.4C17.4 7.1 17.4 6.7 17.1 6.4L16.5 6.5ZM7.5 7.5C7.8 7.2 7.8 6.8 7.5 6.5C7.2 6.2 6.8 6.2 6.5 6.5C5.6 7.4 5.1 8.6 5 9.9C5 10.3 5.3 10.6 5.7 10.6C6.1 10.6 6.4 10.3 6.4 9.9C6.5 9 6.9 8.1 7.5 7.5ZM13 13H11V7H13V13ZM13 17H11V15H13V17Z" />
-                      </svg>
+              <div className="flex items-center gap-3 cursor-pointer group" onClick={handleReset}>
+                  {/* Brain Logo - Lucide Icon */}
+                  <div className="text-editorial-text transition-transform group-hover:scale-110">
+                      <Telescope size={32} strokeWidth={1.5} />
                   </div>
-                  <div className="flex flex-col">
-                      <span className="font-sans font-black text-xl text-editorial-text leading-none tracking-tight">
-                        深度研究
-                      </span>
-                  </div>
+                  {/* Branding Text - Hide when researching */}
+                  {state === AppState.IDLE && (
+                    <div className="flex flex-col animate-fade-in">
+                        <span className="font-sans font-black text-xl text-editorial-text leading-none tracking-tight">
+                          深度研究
+                        </span>
+                    </div>
+                  )}
               </div>
 
               {/* Current Topic Display */}
               {currentConfig?.query && state !== AppState.IDLE && (
-                 <div className="hidden md:flex items-center text-sm font-serif text-editorial-text border-l border-editorial-border pl-6 max-w-lg truncate">
-                    <span className="text-editorial-accent mr-2 italic">正在研究:</span>
+                 <div className="hidden md:flex items-center text-sm font-serif text-editorial-text border-l border-editorial-border pl-6 max-w-lg truncate animate-fade-in">
+                    <span className="text-editorial-accent mr-2 italic">
+                       {state === AppState.COMPLETE ? '研究完成:' : '正在研究:'}
+                    </span>
                     <span className="truncate font-medium">{currentConfig.query}</span>
                  </div>
               )}
            </div>
            
-           <div className="flex items-center gap-4">
+           <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsHistoryOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 border border-editorial-border rounded text-xs font-sans font-medium text-editorial-subtext hover:border-editorial-accent hover:text-editorial-accent transition-all"
+                className="p-2 text-editorial-subtext hover:text-editorial-accent hover:bg-editorial-highlight rounded-md transition-all"
+                title="历史记录"
               >
-                 <span className="w-4 h-4 flex items-center justify-center">H</span>
-                 <span>历史记录</span>
+                 <History size={20} strokeWidth={1.5} />
               </button>
               
               <button 
                 onClick={handleReset}
-                className="flex items-center gap-2 px-3 py-1.5 border border-editorial-border rounded text-xs font-sans font-medium text-editorial-subtext hover:border-editorial-accent hover:text-editorial-accent transition-all"
+                className="p-2 text-editorial-subtext hover:text-editorial-accent hover:bg-editorial-highlight rounded-md transition-all"
+                title="新研究"
               >
-                 <span className="w-4 h-4 flex items-center justify-center">+</span>
-                 <span>新研究</span>
+                 <SquarePen size={20} strokeWidth={1.5} />
               </button>
 
-              <div className="h-4 w-px bg-editorial-border mx-2"></div>
+              <div className="h-6 w-px bg-editorial-border mx-1"></div>
 
               <button 
                 onClick={() => setIsSettingsOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 border border-editorial-border rounded text-xs font-mono uppercase tracking-wider text-editorial-subtext hover:text-editorial-text hover:border-editorial-text transition-all"
+                className="flex items-center gap-2 px-2 py-1.5 text-editorial-subtext hover:text-editorial-text rounded-md transition-all group"
+                title="系统配置"
               >
-                <span>{settings.model || 'MODEL'}</span>
-                <span className={`w-1.5 h-1.5 rounded-full ${settings.provider === 'google' ? 'bg-editorial-accent' : 'bg-green-500'}`}></span>
+                <SettingsIcon size={20} strokeWidth={1.5} className="group-hover:rotate-45 transition-transform duration-500"/>
+                <span className={`w-2 h-2 rounded-full ${settings.provider === 'google' ? 'bg-editorial-accent' : 'bg-green-500'}`}></span>
               </button>
            </div>
        </header>
@@ -383,7 +396,13 @@ const App: React.FC = () => {
                             totalSteps={totalChapters} 
                             currentStep={completedChapters}
                             isComplete={state === AppState.COMPLETE}
-                            finalStats={finalResult ? { tokens: finalResult.totalTokens || 0, searchCount: finalResult.totalSearchQueries || 0, wordCount: finalResult.wordCount } : undefined}
+                            startTime={startTime}
+                            finalStats={finalResult ? { 
+                                tokens: finalResult.totalTokens || 0, 
+                                searchCount: finalResult.totalSearchQueries || 0, 
+                                wordCount: finalResult.wordCount,
+                                duration: (finalResult as any).endTime && (finalResult as any).startTime ? (finalResult as any).endTime - (finalResult as any).startTime : undefined
+                            } : undefined}
                             reportData={finalResult ? { title: finalResult.title, report: finalResult.report, sources: finalResult.sources } : undefined}
                         />
                     </div>
@@ -393,13 +412,11 @@ const App: React.FC = () => {
                  {state === AppState.COMPLETE && (
                     <button
                         onClick={() => setIsLeftSidebarOpen(!isLeftSidebarOpen)}
-                        className={`absolute z-30 top-1/2 transform -translate-y-1/2 bg-white border border-editorial-border shadow-md py-3 pr-2 pl-1 rounded-r-md hover:bg-editorial-highlight transition-all duration-300 group`}
+                        className={`absolute z-30 top-1/2 transform -translate-y-1/2 bg-white border border-editorial-border shadow-md py-3 pr-1 pl-1 rounded-r-md hover:bg-editorial-highlight transition-all duration-300 group`}
                         style={{ left: isLeftSidebarOpen ? leftSidebarWidth : 0 }}
                         title={isLeftSidebarOpen ? "收起日志" : "展开日志"}
                     >
-                        <div className="writing-vertical-lr text-xs font-mono font-bold text-editorial-subtext tracking-widest uppercase flex items-center gap-2">
-                             <span className="w-1 h-1 rounded-full bg-editorial-accent group-hover:scale-125 transition-transform"></span>
-                        </div>
+                         {isLeftSidebarOpen ? <PanelLeftClose size={14} className="text-editorial-subtext"/> : <PanelLeftOpen size={14} className="text-editorial-accent"/>}
                     </button>
                  )}
 

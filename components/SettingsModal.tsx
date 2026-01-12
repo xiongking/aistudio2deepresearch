@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { X, Check } from 'lucide-react';
 import { Settings } from '../types';
 
 interface SettingsModalProps {
@@ -95,7 +96,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
         <div className="p-6 border-b border-editorial-border flex justify-between items-center bg-editorial-bg sticky top-0 z-10">
           <h2 className="font-serif text-xl font-bold text-editorial-text">系统配置</h2>
           <button onClick={onClose} className="text-editorial-subtext hover:text-editorial-text transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" /></svg>
+            <X size={24} strokeWidth={1.5} />
           </button>
         </div>
 
@@ -137,6 +138,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                             >
                                 {preset.icon}
                                 <span className={`text-sm ${selectedPresetId === preset.id ? 'font-bold text-editorial-text' : 'text-editorial-subtext'}`}>{preset.name}</span>
+                                {selectedPresetId === preset.id && <Check size={14} className="ml-auto text-editorial-accent"/>}
                             </button>
                         ))}
                     </div>
@@ -206,7 +208,14 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, settings
                 placeholder="tvly-..."
                 className="w-full bg-white border border-editorial-border px-4 py-3 text-editorial-text rounded focus:border-editorial-accent focus:outline-none transition-all font-mono text-sm"
               />
-              {!isGoogle && <p className="text-[10px] text-editorial-subtext mt-1">自定义模式下，必须配置 Tavily 才能进行联网检索。</p>}
+              {!isGoogle && (
+                <>
+                  <p className="text-[10px] text-editorial-subtext mt-1">自定义模式下，必须配置 Tavily 才能进行联网检索。</p>
+                  <p className="text-[10px] text-editorial-subtext mt-0.5">
+                    Tavily API key 申请地址：<a href="https://app.tavily.com/home" target="_blank" rel="noreferrer" className="text-editorial-accent hover:underline">https://app.tavily.com/home</a>
+                  </p>
+                </>
+              )}
             </div>
           </div>
 

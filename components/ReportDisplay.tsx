@@ -72,7 +72,13 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
 
   // Parse Headers for TOC (H1 -> H2 -> H3)
   useEffect(() => {
-    const lines = report.split('\n');
+    // 1. Process Citations: [1] -> <sup><a href="#ref-1">[1]</a></sup>
+    const reportWithCitations = report.replace(
+        /\[(\d+)\]/g, 
+        '<sup class="citation-ref"><a href="#ref-$1" data-id="$1">[$1]</a></sup>'
+    );
+
+    const lines = reportWithCitations.split('\n');
     const rootToc: TOCItem[] = [];
     let currentH1: TOCItem | null = null;
     let currentH2: TOCItem | null = null;
@@ -124,9 +130,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
     }
 
     setToc(rootToc);
-    // Strip citations like [1]
-    const contentWithoutCitations = newLines.join('\n').replace(/\[([0-9]+)\]/g, ''); 
-    setProcessedReport(contentWithoutCitations);
+    setProcessedReport(newLines.join('\n'));
   }, [report, sources]);
 
   const handleScrollTo = (id: string) => {
@@ -176,6 +180,30 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
               .document-theme h1, .document-theme h2, .document-theme h3, .document-theme li, .document-theme td, .document-theme th, .document-theme blockquote p {
                 text-indent: 0;
               }
+              /* Strict Mermaid Reset */
+              .document-theme .mermaid, .document-theme .mermaid svg {
+                text-indent: 0 !important;
+                margin-left: 0 !important;
+                white-space: normal !important;
+              }
+              /* Citation Styles */
+              .citation-ref {
+                font-size: 0.75em;
+                vertical-align: super;
+                margin-left: 0.1em;
+                user-select: none;
+              }
+              .citation-ref a {
+                color: #B8860B;
+                text-decoration: none;
+                border-bottom: none;
+                font-weight: bold;
+                transition: opacity 0.2s;
+              }
+              .citation-ref a:hover {
+                opacity: 0.7;
+                text-decoration: none;
+              }
             `}</style>
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -184,6 +212,8 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 h1: ({node, ...props}) => <h1 className="text-4xl font-serif font-bold text-editorial-text mb-8 text-left !indent-0" {...props} />,
                 h2: ({node, ...props}) => <h2 className="text-2xl font-serif font-bold text-editorial-text mt-8 mb-4 text-left !indent-0 scroll-mt-24" {...props} />, 
                 h3: ({node, ...props}) => <h3 className="text-xl font-serif font-bold text-editorial-text mt-6 mb-3 text-left !indent-0 scroll-mt-24" {...props} />,
+                // Removed custom strong component to allow standard browser/tailwind font-weight handling for robustness
+                strong: ({node, ...props}) => <strong className="font-bold text-editorial-text !important" {...props} />,
                 table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed !indent-0" {...props} />,
                 thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent" {...props} />,
                 tbody: ({node, ...props}) => <tbody {...props} />,
@@ -194,7 +224,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                   const match = /language-mermaid/.test(className || '')
                   if (match) {
                     return (
-                      <div className="mermaid bg-[#FAFAF8] p-6 border border-editorial-border flex justify-center my-10 overflow-x-auto rounded-sm !indent-0">
+                      <div className="mermaid bg-[#FAFAF8] p-6 border border-editorial-border flex justify-center my-10 overflow-x-auto rounded-sm !indent-0 not-prose">
                         {String(children).replace(/\n$/, '')}
                       </div>
                     )
@@ -219,8 +249,8 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
               </h1>
               <div className="grid grid-cols-1 gap-1.5 !indent-0">
                 {sources.map((s, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm !indent-0">
-                    <span className="font-mono text-editorial-subtext text-[10px] pt-1 w-5 text-right flex-none">[{i+1}]</span>
+                  <div key={i} id={`ref-${i+1}`} className="flex items-start gap-2 text-sm !indent-0 scroll-mt-32">
+                    <span className="font-mono text-editorial-accent font-bold text-[10px] pt-1 w-6 text-right flex-none">[{i+1}]</span>
                     
                     <a href={s.uri} target="_blank" rel="noreferrer" className="group flex items-center gap-2 hover:bg-editorial-highlight px-2 rounded -ml-2 transition-colors max-w-full">
                         <img 

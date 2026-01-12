@@ -64,8 +64,8 @@ const OutlineEditor: React.FC<OutlineEditorProps> = ({ initialTitle, initialChap
          <div className="space-y-4 mb-8 pl-4 border-l-2 border-editorial-accent/20">
             {chapters.map((chapter, idx) => (
               <div key={idx} className="flex items-baseline gap-4">
-                <span className="font-mono text-editorial-accent font-bold text-lg w-8 text-right">{idx + 1}.</span>
-                <span className="font-serif text-xl text-editorial-text">{chapter}</span>
+                <span className="font-mono text-editorial-accent font-bold text-lg w-8 text-right flex-none">{idx + 1}.</span>
+                <span className="font-serif text-xl text-editorial-text break-words w-full">{chapter}</span>
               </div>
             ))}
          </div>
@@ -117,21 +117,27 @@ const OutlineEditor: React.FC<OutlineEditorProps> = ({ initialTitle, initialChap
                     onDragStart={() => handleDragStart(idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
                     onDragEnd={handleDragEnd}
-                    className={`flex gap-3 items-center p-2 rounded border border-transparent hover:border-editorial-border hover:bg-editorial-highlight/50 transition-all ${draggedItemIndex === idx ? 'opacity-50 bg-editorial-highlight' : ''}`}
+                    className={`flex gap-3 items-start p-2 rounded border border-transparent hover:border-editorial-border hover:bg-editorial-highlight/50 transition-all ${draggedItemIndex === idx ? 'opacity-50 bg-editorial-highlight' : ''}`}
                  >
-                   <div className="cursor-grab active:cursor-grabbing text-editorial-border hover:text-editorial-subtext px-1">
+                   <div className="cursor-grab active:cursor-grabbing text-editorial-border hover:text-editorial-subtext px-1 mt-2">
                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
                    </div>
                    
-                   <input
-                     type="text"
+                   <textarea
                      value={chapter}
+                     rows={1}
                      onChange={(e) => handleChapterChange(idx, e.target.value)}
-                     className="flex-1 font-sans text-sm bg-transparent outline-none text-editorial-text placeholder-gray-400"
+                     ref={(el) => {
+                        if (el) {
+                            el.style.height = 'auto';
+                            el.style.height = el.scrollHeight + 'px';
+                        }
+                     }}
+                     className="flex-1 font-sans text-sm bg-transparent outline-none text-editorial-text placeholder-gray-400 resize-none overflow-hidden py-1 leading-relaxed"
                      placeholder="输入章节标题"
                    />
                    
-                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                   <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-1">
                       <button onClick={() => addChapterAt(idx)} className="p-1 text-editorial-accent hover:bg-editorial-accent/10 rounded">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                       </button>

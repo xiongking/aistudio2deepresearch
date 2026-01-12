@@ -251,7 +251,8 @@ export class DeepResearchService {
     this.initAI(settings); 
     const model = settings.model || (settings.provider === 'google' ? 'gemini-3-pro-preview' : 'gpt-4o');
     
-    const allSources: Source[] = [];
+    const globalSources: Source[] = [];
+    const uniqueSourceMap = new Map<string, number>(); // uri -> index (1-based)
     const reportSections: string[] = [];
     const chapterFindingsCache: string[] = [];
     let totalTokens = 0;
@@ -282,7 +283,7 @@ export class DeepResearchService {
       
       // B. Search
       const chapterFindings: string[] = [];
-      const chapterSources: Source[] = [];
+      const chapterLocalSources: Source[] = [];
       
       for (const q of queries) {
         this.checkCancelled();
@@ -299,7 +300,7 @@ export class DeepResearchService {
         
         if (res.summary) chapterFindings.push(res.summary);
         if (res.sources && res.sources.length > 0) {
-            chapterSources.push(...res.sources);
+            chapterLocalSources.push(...res.sources);
             yield {
                 id: crypto.randomUUID(),
                 timestamp: Date.now(),
@@ -309,14 +310,35 @@ export class DeepResearchService {
             };
         }
       }
+
+      // C. Update Global Sources Index for this chapter
+      const chapterPromptSources: string[] = [];
       
-      allSources.push(...chapterSources);
+      for (const src of chapterLocalSources) {
+          let index: number;
+          if (uniqueSourceMap.has(src.uri)) {
+              index = uniqueSourceMap.get(src.uri)!;
+          } else {
+              globalSources.push(src);
+              index = globalSources.length; // 1-based index
+              uniqueSourceMap.set(src.uri, index);
+          }
+          // Format for Prompt: [index] Title
+          chapterPromptSources.push(`[${index}] ${src.title}`);
+      }
+      
       chapterFindingsCache.push(chapterFindings.join('\n').slice(0, 1000)); 
 
-      // C. Write Chapter
+      // D. Write Chapter
       yield { id: crypto.randomUUID(), timestamp: Date.now(), type: 'writing', message: `撰写: ${chapter}` };
       
-      const { content: chapterContent, usage: writeTokens } = await this.writeChapter(config.query, chapter, chapterFindings, chapterSources, model);
+      const { content: chapterContent, usage: writeTokens } = await this.writeChapter(
+          config.query, 
+          chapter, 
+          chapterFindings, 
+          chapterPromptSources, // Pass formatted source list with Global IDs
+          model
+      );
       totalTokens += writeTokens;
       reportSections.push(chapterContent);
 
@@ -331,7 +353,6 @@ export class DeepResearchService {
     }
 
     // 3. Final Compilation
-    const uniqueSources = Array.from(new Map(allSources.map(s => [s.uri, s])).values());
     const fullReport = `# ${title}\n\n` + reportSections.join('\n\n');
     const wordCount = fullReport.replace(/\s+/g, '').length;
 
@@ -344,7 +365,7 @@ export class DeepResearchService {
         completedResult: {
           title: title,
           report: fullReport,
-          sources: uniqueSources,
+          sources: globalSources, // Return strict ordered global list
           totalSearchQueries: this.searchCount,
           totalTokens: totalTokens,
           wordCount: wordCount
@@ -381,35 +402,45 @@ export class DeepResearchService {
     topic: string, 
     chapterTitle: string, 
     findings: string[], 
-    sources: Source[],
+    promptSources: string[], // e.g., ["[1] Source A", "[5] Source B"]
     model: string
   ): Promise<{ content: string, usage: number }> {
     const currentDate = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
-    const currentYear = new Date().getFullYear();
     
     const findingsText = findings.join('\n\n');
+    // Deduplicate prompt sources roughly for the prompt context
+    const uniquePromptSources = Array.from(new Set(promptSources)).join('\n');
+
     const systemPrompt = `你是一位严谨的深度研究员。当前日期是 ${currentDate}。请用Markdown格式撰写。`;
     const prompt = `
       主题: "${topic}"
       当前章节: "${chapterTitle}"
       
-      研究材料:
+      研究材料 (Findings):
       ${findingsText}
+      
+      可用参考文献 (Sources):
+      ${uniquePromptSources}
       
       任务: 撰写本章节内容。
       
       要求:
-      1. **数据时效性**: 务必以 ${currentDate} 的视角进行写作。**严禁**使用过去的预测数据作为未来的预测（例如：如果现在是 ${currentYear} 年，不要说"预计 ${currentYear-1} 年达到..."，而应该寻找 ${currentYear-1} 年的实际数据）。如果材料中只有旧数据，必须明确指出数据的滞后性。
+      1. **数据时效性**: 务必以 ${currentDate} 的视角进行写作。
       2. **学术语调**: 正式、客观、深度。简体中文。
       3. **篇幅**: 详尽（约 800-1500 字）。
-      4. **可视化**: 必须包含一个 Mermaid.js 图表。
-         - **Mermaid 严格规范**:
-           - 节点文本必须使用双引号包裹，例如: A["文本内容"] --> B["另一文本"]
-           - 决策节点使用花括号，例如: C{"决策点"}
-           - 换行只使用 <br> 标签。
-           - 不要使用特殊字符或弯引号。
-      5. **表格**: 如有数据，使用Markdown表格。
-      6. **纯净文本**: **严禁**在正文中使用 [1]、[x] 等引用标记。正文应保持纯净阅读体验。
+      4. **引用规范 (关键)**: 
+         - **必须**在文中引用事实、数据或观点时，在句尾使用上标数字 **[x]** 标注来源。
+         - **严禁**使用未在 "可用参考文献" 中列出的编号。
+         - 例如: "根据最新报告显示，增长率为5% [1]。"
+      5. **粗体与引号规范 (Bug修复)**:
+         - **严禁**使用 **"文本"** 或 **“文本”** 的格式（这会导致渲染错误）。
+         - **必须**将引号放在粗体标记之外。
+         - 正确示例: "**核心概念**" 或 "根据 **报告** 指出"。
+         - 错误示例: **"核心概念"** (错误)。
+      6. **可视化**: 必须包含一个 Mermaid.js 图表。
+         - **Mermaid 规范**: 仅使用英文ID (NodeA)，严禁在图表代码中提及 "mermaid" 字眼，仅用 "下图展示..." 引出。
+         - 节点文本用英文双引号。
+      7. **纯净文本**: 除去引用标记 [x] 外，不要添加其他元数据标记。
       
       直接输出 Markdown 内容。
     `;
