@@ -181,7 +181,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 margin-bottom: 1.5em;
               }
               
-              /* Explicitly reset indent for elements that might inherit or misbehave */
+              /* Strict Indent Reset for everything else */
               .document-theme h1, 
               .document-theme h2, 
               .document-theme h3, 
@@ -198,14 +198,15 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
               .document-theme th, 
               .document-theme td, 
               .document-theme blockquote,
-              .document-theme blockquote p,
               .document-theme .mermaid,
               .document-theme sup,
+              .document-theme img,
               .citation-badge {
                 text-indent: 0 !important;
+                margin-left: 0 !important;
               }
 
-              /* Lists indentation handling */
+              /* Lists indentation handling (padding, not text-indent) */
               .document-theme ul, .document-theme ol {
                 padding-left: 2em;
               }
@@ -213,12 +214,23 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 padding-left: 0.2em;
                 margin-bottom: 0.5em;
               }
+              
+              /* Table typography fixes */
+              .document-theme table th, .document-theme table td {
+                 text-align: left;
+                 text-indent: 0;
+              }
 
               /* Strict Mermaid Reset */
-              .document-theme .mermaid, .document-theme .mermaid svg {
+              .document-theme .mermaid {
+                display: flex;
+                justify-content: center;
+                background-color: #FAFAF8;
+                padding: 1.5rem;
+                border: 1px solid #E8E4DF;
+                margin: 2rem 0;
+                overflow-x: auto;
                 text-indent: 0 !important;
-                margin-left: 0 !important;
-                white-space: normal !important;
               }
               
               /* Prominent Citation Badge Style */
@@ -243,7 +255,6 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 transform: translateY(-2px);
                 transition: all 0.2s ease;
                 box-shadow: 0 1px 2px rgba(184, 134, 11, 0.3);
-                text-indent: 0 !important; /* Ensure no indent inside badge */
               }
               .citation-badge:hover {
                 background-color: #1A1A1A; /* Dark on hover */
@@ -258,8 +269,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 h1: ({node, ...props}) => <h1 className="text-4xl font-serif font-bold text-editorial-text mb-8 text-left !indent-0" {...props} />,
                 h2: ({node, ...props}) => <h2 className="text-2xl font-serif font-bold text-editorial-text mt-8 mb-4 text-left !indent-0 scroll-mt-24" {...props} />, 
                 h3: ({node, ...props}) => <h3 className="text-xl font-serif font-bold text-editorial-text mt-6 mb-3 text-left !indent-0 scroll-mt-24" {...props} />,
-                // Removed custom strong component to allow standard browser/tailwind font-weight handling for robustness
-                strong: ({node, ...props}) => <strong className="font-bold text-editorial-text !important" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-bold text-editorial-text" {...props} />,
                 table: ({node, ...props}) => <table className="w-full text-left border-collapse my-8 border-t-2 border-b-2 border-editorial-text table-fixed !indent-0" {...props} />,
                 thead: ({node, ...props}) => <thead className="bg-[#EFEBE6] border-b-2 border-editorial-accent !indent-0" {...props} />,
                 tbody: ({node, ...props}) => <tbody className="!indent-0" {...props} />,
@@ -270,7 +280,7 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                   const match = /language-mermaid/.test(className || '')
                   if (match) {
                     return (
-                      <div className="mermaid bg-[#FAFAF8] p-6 border border-editorial-border flex justify-center my-10 overflow-x-auto rounded-sm !indent-0 not-prose">
+                      <div className="mermaid not-prose">
                         {String(children).replace(/\n$/, '')}
                       </div>
                     )
