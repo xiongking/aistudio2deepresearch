@@ -192,7 +192,7 @@ const LogStream: React.FC<LogStreamProps> = ({ logs, totalSteps = 0, currentStep
       </div>
       
       {/* Stream */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {logs.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center opacity-40">
              <div className="w-px h-16 bg-editorial-border mb-4"></div>

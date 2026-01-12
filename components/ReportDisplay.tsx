@@ -222,6 +222,15 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
               }
 
               /* Strict Mermaid Reset */
+              .document-theme .mermaid, 
+              .document-theme .mermaid svg,
+              .document-theme .mermaid text,
+              .document-theme .mermaid g,
+              .document-theme .mermaid path {
+                text-indent: 0 !important;
+                text-align: center !important;
+              }
+
               .document-theme .mermaid {
                 display: flex;
                 justify-content: center;
@@ -230,7 +239,6 @@ const ReportDisplay: React.FC<ReportDisplayProps> = ({ title, report, sources, o
                 border: 1px solid #E8E4DF;
                 margin: 2rem 0;
                 overflow-x: auto;
-                text-indent: 0 !important;
               }
               
               /* Prominent Citation Badge Style */
